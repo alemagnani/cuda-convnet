@@ -7,7 +7,8 @@ LIB := -L/usr/lib/nvidia-current/ -lpthread -L$(ATLAS_LIB_PATH) -L$(CUDA_INSTALL
 
 USECUBLAS   := 1
 
-PYTHON_VERSION=$(shell python -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2)
+#PYTHON_VERSION=$(shell python -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2)
+PYTHON_VERSION=2.7
 LIB += -lpython$(PYTHON_VERSION)
 
 GENCODE_ARCH := -gencode=arch=compute_20,code=\"sm_20,compute_20\" -gencode=arch=compute_30,code=\"sm_30,compute_30\"

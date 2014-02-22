@@ -28,6 +28,7 @@
 #define MATRIX_H_
 
 #include <matrix_funcs.h>
+
 #ifdef NUMPY_INTERFACE
 #include <Python.h>
 #include <arrayobject.h>
@@ -101,7 +102,7 @@ extern "C" {
 #define MTYPE_MAX numeric_limits<MTYPE>::max()
 
 class Matrix {
-private:
+protected:
     MTYPE* _data;
     bool _ownsData;
     long int _numRows, _numCols;
@@ -132,6 +133,11 @@ public:
     enum FUNCTION {
         TANH, RECIPROCAL, SQUARE, ABS, EXP, LOG, ZERO, ONE, LOGISTIC1, LOGISTIC2, SIGN
     };
+
+    enum MATRIX_TYPE {
+        DENSE, CSR
+    };
+
     Matrix();
     Matrix(long int numRows, long int numCols);
 #ifdef NUMPY_INTERFACE
@@ -141,6 +147,10 @@ public:
     Matrix(MTYPE* data, long int numRows, long int numCols);
     Matrix(MTYPE* data, long int numRows, long int numCols, bool transpose);
     ~Matrix();
+
+    virtual inline MATRIX_TYPE get_type() const {
+    	return DENSE;
+    }
 
     inline MTYPE& getCell(long int i, long int j) const {
         assert(i >= 0 && i < _numRows);
@@ -294,6 +304,7 @@ public:
     void scale(MTYPE alpha, Matrix& target);
     void reshape(long int numRows, long int numCols);
     Matrix& reshaped(long int numRows, long int numCols);
+
     void printShape(const char* name) const;
     bool hasNan() const;
     bool hasInf() const;

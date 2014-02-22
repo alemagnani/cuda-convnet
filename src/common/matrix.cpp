@@ -427,6 +427,8 @@ Matrix& Matrix::transpose(bool hard) const {
     return meTrans;
 }
 
+
+
 Matrix& Matrix::tile(long int timesY, long int timesX) const {
     Matrix& tiled = *new Matrix(this->_numRows * timesY, this->_numCols * timesX);
     _tileTo2(tiled);
@@ -845,6 +847,9 @@ void Matrix::reshape(long int numRows, long int numCols) {
     _numRows = numRows;
     _numCols = numCols;
 }
+
+
+
 
 Matrix& Matrix::reshaped(long int numRows, long int numCols) {
     assert(_numElements == numRows*numCols);
