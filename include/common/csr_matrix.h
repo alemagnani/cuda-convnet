@@ -26,24 +26,41 @@ extern "C" {
 
 class CsrMatrix : public Matrix  {
 private:
-    long int* _csrColIndA;
-    long int* _csrRowPtrA;
+    int* _csrColInd;
+    int* _csrRowPtr;
+
     long int _nzz;
+
+    bool _ownsDataColInd;
+    bool _ownsDataRowInd;
+
 
 public:
     CsrMatrix();
     CsrMatrix(long int numRows, long int numCols);
 #ifdef NUMPY_INTERFACE
-    CsrMatrix(const PyArrayObject *data, long int* csrColIndA, long int* csrRowPtrA, long int numRows, long int numCols );
+    CsrMatrix(const PyArrayObject *data, const PyArrayObject *csrColIndA, const PyArrayObject *csrRowPtrA, long int numRows, long int numCols );
 #endif
     ~CsrMatrix();
+
+    inline long int get_non_zeros() const{
+    	return _nzz;
+    }
+
+    inline int * getColInd() const{
+    	return _csrColInd;
+    }
+
+    inline int* getRowPtr() const{
+    	return _csrRowPtr;
+    }
 
     inline MATRIX_TYPE get_type() const {
         	return CSR;
         }
-
-
 };
 
+void readPythonArray(const PyArrayObject *src, int** data, long int& entries,
+		bool& ownsData);
 
 #endif /* CSR_MATRIX_H_ */

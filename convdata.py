@@ -21,6 +21,7 @@
 # ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+from scipy.sparse import csr_matrix, csc_matrix
 
 from data import *
 import numpy.random as nr
@@ -122,16 +123,26 @@ class CroppedCIFARDataProvider(LabeledMemoryDataProvider):
                 target[:,c] = pic.reshape((self.get_data_dims(),))
     
 class DummyConvNetDataProvider(LabeledDummyDataProvider):
-    def __init__(self, data_dim):
+    def __init__(self, data_dim, sparse=True):
         LabeledDummyDataProvider.__init__(self, data_dim)
+        self.sparse = sparse
         
     def get_next_batch(self):
         epoch, batchnum, dic = LabeledDummyDataProvider.get_next_batch(self)
         
         dic['data'] = n.require(dic['data'].T, requirements='C')
+        if self.sparse:
+
+            sparse_matrix = csc_matrix(dic['data'])
+            rows, cols = sparse_matrix.shape
+            print 'rows: {}, cols{}, type: {}'.format(rows, cols, type(sparse_matrix))
+            print 'indices: {}, row ptr: {}'.format(sparse_matrix.indices.shape, sparse_matrix.indptr.shape )
+            this_data = [sparse_matrix.data, sparse_matrix.indices, sparse_matrix.indptr, rows, cols]
+        else:
+            this_data = dic['data']
         dic['labels'] = n.require(dic['labels'].T, requirements='C')
         
-        return epoch, batchnum, [dic['data'], dic['labels']]
+        return epoch, batchnum, [this_data, dic['labels']]
     
     # Returns the dimensionality of the two data matrices returned by get_next_batch
     def get_data_dims(self, idx=0):

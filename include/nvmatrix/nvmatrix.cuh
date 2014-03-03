@@ -45,6 +45,10 @@
 #include "nvmatrix_kernels.cuh"
 #include "nvmatrix_operators.cuh"
 
+#include <iostream>
+
+using namespace std;
+
 #ifdef WARNINGS
 #define WARN(msg) printf("WARN: File %s, line %d: %s\n", __FILE__, __LINE__, msg);
 #else
@@ -59,7 +63,7 @@
                             exit(EXIT_FAILURE);}} while(0)
 
 class NVMatrix {
-private:
+protected:
     int _numCols, _numRows;
     int _numElements;
     int _stride;
@@ -105,7 +109,7 @@ public:
     NVMatrix(const NVMatrix& like);
     NVMatrix(const Matrix& like);
     NVMatrix(float* devData, int numRows, int numCols, int stride, bool isTrans);
-    ~NVMatrix();
+    virtual ~NVMatrix();
 
     static void initRandom(unsigned long long seed);
     static void initRandom();
@@ -114,6 +118,10 @@ public:
     static curandState* getCurandState();
     static void destroyRandom();
     static pthread_mutex_t* makeMutex();
+
+    virtual inline Matrix::MATRIX_TYPE get_type() const {
+        	return Matrix::DENSE;
+    }
 
     /*
      * DO NOT DEREFERENCE IN HOST CODE! This is a device memory pointer.
@@ -202,8 +210,8 @@ public:
     }
    
 
-    void copyFromHost(const Matrix& hostMatrix);
-    void copyFromHost(const Matrix& hostMatrix, bool resizeDeviceMatrix);
+    virtual void copyFromHost(const Matrix& hostMatrix);
+    virtual void copyFromHost(const Matrix& hostMatrix, bool resizeDeviceMatrix);
     void copyToHost(Matrix& hostMatrix) const;
     void copyToHost(Matrix& hostMatrix, bool resizeTarget) const;
     void copy(NVMatrix& dest) const;
@@ -239,9 +247,9 @@ public:
     NVMatrix& slice(int startRow, int endRow, int startCol, int endCol) const;
     void slice(int startRow, int endRow, int startCol, int endCol, NVMatrix& target) const;
     NVMatrix& sliceRows(int startRow, int endRow) const;
-    void sliceRows(int startRow, int endRow, NVMatrix& target) const;
+    virtual void sliceRows(int startRow, int endRow, NVMatrix& target) const;
     NVMatrix& sliceCols(int startCol, int endCol) const;
-    void sliceCols(int startCol, int endCol, NVMatrix& target) const;
+    virtual void sliceCols(int startCol, int endCol, NVMatrix& target) const;
 
     template <class Op> void apply(Op op, NVMatrix& target) {
         if (!target.isSameDims(*this)) {

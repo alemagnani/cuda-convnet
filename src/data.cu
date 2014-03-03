@@ -26,6 +26,8 @@
 
 #include <algorithm>
 #include <data.cuh>
+#include "csr_nvmatrix.cuh"
+#include "csc_nvmatrix.cuh"
 
 using namespace std;
 
@@ -57,7 +59,14 @@ void DataProvider::setData(CPUData& hData) {
     if (_dataSize < MAX_DATA_ON_GPU) {
         for (int i = 0; i < hData.getSize(); i++) {
             if (i >= _data.size()) {
-                _data.push_back(new NVMatrix());
+
+            	if (hData[i].get_type() == Matrix::DENSE){
+            		_data.push_back(new NVMatrix());
+            	}else if (hData[i].get_type() == Matrix::CSR) {
+            		_data.push_back(new CsrNVMatrix());
+            	}else if (hData[i].get_type() == Matrix::CSC) {
+            	    _data.push_back(new CscNVMatrix());
+            	}
             }
             _data[i]->copyFromHost(hData[i], true);
         }

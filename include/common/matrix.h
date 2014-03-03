@@ -135,7 +135,7 @@ public:
     };
 
     enum MATRIX_TYPE {
-        DENSE, CSR
+        DENSE, CSR, CSC
     };
 
     Matrix();
@@ -146,7 +146,7 @@ public:
     Matrix(const Matrix &like);
     Matrix(MTYPE* data, long int numRows, long int numCols);
     Matrix(MTYPE* data, long int numRows, long int numCols, bool transpose);
-    ~Matrix();
+    virtual ~Matrix();
 
     virtual inline MATRIX_TYPE get_type() const {
     	return DENSE;

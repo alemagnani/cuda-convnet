@@ -108,6 +108,7 @@ class DataProvider:
         type = type or DataProvider.get_batch_meta(data_dir)['dp_type'] # allow data to decide data provider
         if type.startswith("dummy-"):
             name = "-".join(type.split('-')[:-1]) + "-n"
+            print 'type: {}, name: {}'.format(type,name)
             if name not in dp_types:
                 raise DataProviderException("No such data provider: %s" % type)
             _class = dp_classes[name]
@@ -171,6 +172,7 @@ class LabeledDummyDataProvider(DummyDataProvider):
         self.curr_epoch = 1
         self.curr_batchnum = 1
         self.batch_idx=0
+
         
     def get_num_classes(self):
         return self.num_classes
