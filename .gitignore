@@ -4,3 +4,7 @@ obj/
 _ConvNet.so
 moredataproviders.py
 whales
+.cproject
+.idea/
+.project
+.settings/
