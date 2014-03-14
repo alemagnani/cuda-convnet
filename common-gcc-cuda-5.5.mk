@@ -89,7 +89,7 @@ CWARN_FLAGS := $(CXXWARN_FLAGS) \
 # architecture flag for nvcc and gcc compilers build
 CUBIN_ARCH_FLAG :=
 CXX_ARCH_FLAGS  :=
-NVCCFLAGS       := --gpu-architecture compute_20 --gpu-code compute_20 -ccbin=gcc-4.4
+NVCCFLAGS       := --gpu-architecture compute_30 --gpu-code compute_30 -ccbin=gcc-4.4
 LIB_ARCH        := $(OSARCH)
 
 # Determining the necessary Cross-Compilation Flags

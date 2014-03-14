@@ -25,7 +25,6 @@ protected:
 	 bool _ownsDataColInd;
 	 bool _ownsDataRowInd;
 
-	 static cusparseMatDescr_t _descr;
 
 public:
 	 CsrNVMatrix();
@@ -44,15 +43,7 @@ public:
 
     virtual void rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const;
 
-    static cusparseMatDescr_t getDescription(){
-       	if (_descr == NULL){
-       			cusparseStatus_t cusparseStatus = cusparseCreateMatDescr(&_descr);
-       			checkCudaErrors(cusparseStatus);
-       			cusparseSetMatType(_descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-       			cusparseSetMatIndexBase(_descr,CUSPARSE_INDEX_BASE_ZERO);
-       		}
-       		return _descr;
-       }
+
 
 
     /*

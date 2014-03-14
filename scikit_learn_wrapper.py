@@ -142,7 +142,7 @@ def main():
 
     (opts, args) = op.parse_args()
 
-    newsgroup = True
+    newsgroup = False
     if newsgroup:
         categories = [
             'alt.atheism',

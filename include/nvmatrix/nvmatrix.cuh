@@ -34,7 +34,6 @@
 
 #include <map>
 #include <cublas.h>
-#include <cusparse_v2.h>
 #include <cuda_runtime.h>
 #include <curand.h>
 
@@ -95,7 +94,6 @@ protected:
     bool _isTrans;
     bool _ownsData;
 
-    static cusparseHandle_t _cusparseHandle;
 
 //    static std::map<int,curandGenerator_t> rndGen;
     static std::map<int,curandState*> rndDevStates;
@@ -107,15 +105,6 @@ protected:
             fprintf(stderr, msg, NULL);
             exit(EXIT_FAILURE);
         }
-    }
-
-    static void setCusparseHandle(){
-    	if (_cusparseHandle == NULL){
-    		_cusparseHandle = 0;
-    	    cusparseStatus_t cusparseStatus;
-    	    cusparseStatus = cusparseCreate(&_cusparseHandle);
-    	    checkCudaErrors(cusparseStatus);
-    	}
     }
 
 
@@ -161,9 +150,7 @@ public:
 
     virtual bool hasNan();
 
-    static inline cusparseHandle_t getCusparseHandle(){
-    	return _cusparseHandle;
-    }
+
     /*
      * DO NOT DEREFERENCE IN HOST CODE! This is a device memory pointer.
      */

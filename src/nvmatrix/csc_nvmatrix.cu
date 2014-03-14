@@ -2,10 +2,10 @@
 #include <csr_nvmatrix.cuh>
 #include <csc_nvmatrix.cuh>
 #include <cusparse_v2.h>
-
+#include "nvmatrix.cuh"
+#include "cuda_setup.cuh"
 
 CscNVMatrix::CscNVMatrix() {
-	setCusparseHandle();
 	_cscRowInd = NULL;
 	_cscColPtr = NULL;
 
@@ -34,7 +34,7 @@ CscNVMatrix::~CscNVMatrix() {
 }
 
 CscNVMatrix::CscNVMatrix(float* devData,int* cscRowInd, int* cscColPtr,  int numRows, int numCols, int nzz) : NVMatrix( devData, 1, nzz,  1, false) {
-	setCusparseHandle();
+
 	_nzz = nzz;
 	_numRows =  numRows;
 	_numCols = numCols;
@@ -196,9 +196,9 @@ void CscNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float
 	target.resize(_numRows, b.getNumCols());
 	target.setTrans(true);
 
-	cusparseStatus_t cusparseStatus = cusparseScsrmm2(NVMatrix::getCusparseHandle(), CUSPARSE_OPERATION_TRANSPOSE ,CUSPARSE_OPERATION_TRANSPOSE,
+	cusparseStatus_t cusparseStatus = cusparseScsrmm2(CudaState::instance()->cusparseHandle(), CUSPARSE_OPERATION_TRANSPOSE ,CUSPARSE_OPERATION_TRANSPOSE,
 			getNumCols(), b.getNumCols(), getNumRows(),_nzz,
-			&scaleAB, CscNVMatrix::getDescription(),
+			&scaleAB, CudaState::instance()->cusparseDescr(),
 			getDevData(), _cscColPtr, _cscRowInd,
 			b.getDevData(),  b.getLeadingDim() ,
 			&scaleTarget,

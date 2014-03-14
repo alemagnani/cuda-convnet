@@ -12,7 +12,7 @@
 #include <csc_matrix.h>
 #include "sparse_nvmatrix_kernels.cuh"
 #include "nvmatrix_kernels.cuh"
-#include <cusparse_v2.h>
+
 
 
 #include <iostream>
@@ -29,7 +29,7 @@ protected:
 
 	 bool _ownsDataRowInd;
 	 bool _ownsDataColPtr;
-	 static cusparseMatDescr_t _descr;
+
 
 public:
 	 CscNVMatrix();
@@ -44,15 +44,7 @@ public:
     void copyFromHost(const Matrix& hostMatrix);
     void copyFromHost(const Matrix& hostMatrix, bool resizeDeviceMatrix);
 
-    static cusparseMatDescr_t getDescription(){
-    	if (_descr == NULL){
-    			cusparseStatus_t cusparseStatus = cusparseCreateMatDescr(&_descr);
-    			checkCudaErrors(cusparseStatus);
-    			cusparseSetMatType(_descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-    			cusparseSetMatIndexBase(_descr,CUSPARSE_INDEX_BASE_ZERO);
-    		}
-    		return _descr;
-    }
+
 
     /*
      * Does SOFT transpose and returns result, leaving this matrix unchanged
