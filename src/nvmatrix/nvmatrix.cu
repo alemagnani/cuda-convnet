@@ -41,6 +41,9 @@
 
 using namespace std;
 
+
+
+
 /*
  * Device random number generator pointers.
  */
@@ -187,6 +190,10 @@ NVMatrix& NVMatrix::copy() const {
 }
 
 void NVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const {
+	string t = string("rightMult ");
+	RANGE( t.c_str())
+
+
     assert(isContiguous() && b.isContiguous() && target.isContiguous());
 //    assert(&target != &b);
     assert(_numCols == b.getNumRows());
@@ -219,10 +226,17 @@ void NVMatrix::rightMult(const NVMatrix &b, NVMatrix& target) const {
  * if isTrans() returns true.
  */
 void NVMatrix::addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis, float scaleAB) {
+
+
     if (scaleThis == 0) {
+    	//printf("right mul with scale 0-------------------------\n");
         a.rightMult(b, scaleAB, *this);
         return;
     }
+    string t = string("addProduct ");
+    RANGE( t.c_str())
+    //printf("scale is not 0 %f\n", scaleThis);
+
     assert(isContiguous());
     assert(a.getNumCols() == b.getNumRows());
     assert(this->getNumRows() == a.getNumRows());
@@ -231,15 +245,30 @@ void NVMatrix::addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis,
     if(a.getNumRows() % 64 != 0 || a.getNumCols() % 64 != 0 || b.getNumCols() % 64 != 0) {
         WARN("Matrix dimensions not divisible by 64 -- cublasSgemm performance may suffer.");
     }
-    cublasSgemm(a.getTransChar(), b.getTransChar(), a.getNumRows(), b.getNumCols(), a.getNumCols(),
-                scaleAB, a.getDevData(), a.getLeadingDim(), b.getDevData(), b.getLeadingDim(),
-                scaleThis, _devData, getLeadingDim());
-    checkCublasError("cublasSgemm failed");
+    Matrix::MATRIX_TYPE type = a.get_type();
+    if (a.get_type() == Matrix::DENSE){
+    	cublasSgemm(a.getTransChar(), b.getTransChar(), a.getNumRows(), b.getNumCols(), a.getNumCols(),
+    			scaleAB, a.getDevData(), a.getLeadingDim(), b.getDevData(), b.getLeadingDim(),
+    			scaleThis, _devData, getLeadingDim());
+    	checkCublasError("cublasSgemm failed");
+    }else if (a.get_type() == Matrix::CSR || a.get_type() == Matrix::CSC) {
+    	a.addProductChanged(b,scaleThis, scaleAB, *this);
+    }
+
 //    cudaThreadSynchronize();
 }
 
+void NVMatrix::addProductChanged( const NVMatrix &b, float scaleThis, float scaleAB, NVMatrix &target) const{
+	target.addProduct(this, b, scaleThis, scaleAB);
+}
+
+
 void NVMatrix::addProduct(const NVMatrix& a, const NVMatrix &b) {
     addProduct(a, b, 1, 1);
+}
+
+bool NVMatrix::hasNan(){
+	return isnan(sum());
 }
 
 template <class Randomizer>

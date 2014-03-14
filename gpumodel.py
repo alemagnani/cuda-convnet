@@ -47,6 +47,7 @@ class IGPUModel:
         self.model_name = model_name
         self.op = op
         self.options = op.options
+        print 'options are: {}'.format(self.options)
         self.load_dic = load_dic
         self.filename_options = filename_options
         self.dp_params = dp_params
@@ -55,6 +56,7 @@ class IGPUModel:
         #assert self.op.all_values_given()
         
         for o in op.get_options_list():
+            print 'name: {}, value: {}'.format(o.name,o.value)
             setattr(self, o.name, o.value)
 
         # these are things that the model must remember but they're not input parameters

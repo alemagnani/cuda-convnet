@@ -27,6 +27,7 @@
 #include <util.cuh>
 #include <csc_matrix.h>
 #include <csr_matrix.h>
+#include <iostream>
 
 using namespace std;
 
@@ -70,7 +71,9 @@ MatrixV* getMatrixV(PyObject* pyList) {
     for (int i = 0; i < PyList_GET_SIZE(pyList); i++) {
     	PyObject* pythonMatrix = PyList_GET_ITEM(pyList, i);
     	if (PyList_Check(pythonMatrix)){
+    		//cout << " about to get csr matrix";
     		CscMatrix* cscMatrix =  new CscMatrix((PyArrayObject *) PyList_GET_ITEM(pythonMatrix, 0), (PyArrayObject *) PyList_GET_ITEM(pythonMatrix, 1), (PyArrayObject *) PyList_GET_ITEM(pythonMatrix, 2), PyInt_AsLong(PyList_GET_ITEM(pythonMatrix, 3)),PyInt_AsLong(PyList_GET_ITEM(pythonMatrix, 4)));
+    		//cout << " got csr matrix";
     		vec->push_back( cscMatrix);
     	}else{
     		vec->push_back(new Matrix((PyArrayObject*)pythonMatrix));

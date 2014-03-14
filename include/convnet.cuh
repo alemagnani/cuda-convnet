@@ -59,6 +59,8 @@ protected:
     Queue<Worker*> _workerQueue;
     Queue<WorkResult*> _resultQueue;
     
+
+
     // For gradient checking
     int _numFailures;
     int _numTests;

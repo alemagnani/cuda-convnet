@@ -688,11 +688,13 @@ class WeightLayerParser(LayerWithInputParser):
             raise LayerParsingError("Layer '%s': %s." % (dic['name'], e))
         
     def make_weights(self, initW, rows, cols, order='C'):
+        print 'making weights'
         dic = self.dic
         dic['weights'], dic['weightsInc'] = [], []
         if dic['initWFunc']: # Initialize weights from user-supplied python function
             # Initialization function is supplied in the format
             # module.func
+            print 'using function for weights'
             for i in xrange(len(dic['inputs'])):
                 dic['weights'] += [self.call_init_func('initWFunc', (rows[i], cols[i]), input_idx=i)]
 

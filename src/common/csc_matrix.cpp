@@ -27,17 +27,15 @@ CscMatrix::CscMatrix(long int numRows, long int numCols) {
 
 
 
-#ifdef NUMPY_INTERFACE
 CscMatrix::CscMatrix(const PyArrayObject *data, const PyArrayObject * cscRowInd, const PyArrayObject * cscColPtr, long int numRows, long int numCols ) : Matrix(data) {
 	_updateDims(numRows, numCols);
 
-	cout << "\ninitializing c matrix. Is trans:" << isTrans() << "numRows: " << numRows << " numCOls: " << numCols <<  "\n";
+	//cout << "\ninitializing c matrix. Is trans:" << isTrans() << "numRows: " << numRows << " numCOls: " << numCols <<  "\n";
 
 	readPythonArray(cscRowInd, & _cscRowInd, _nzz, _ownsDataRowInd);
 	long int tmp = 0;
 	readPythonArray(cscColPtr, & _cscColPtr, tmp, _ownsDataColPtr);
 }
-#endif
 
 CscMatrix::~CscMatrix() {
 	if (this->_cscRowInd != NULL && this->_ownsDataRowInd) {

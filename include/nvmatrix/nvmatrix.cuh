@@ -34,20 +34,41 @@
 
 #include <map>
 #include <cublas.h>
-#include <cuda.h>
+#include <cusparse_v2.h>
+#include <cuda_runtime.h>
 #include <curand.h>
-#include <helper_cuda.h>
+
+#include <helper_functions.h>  // helper for shared functions common to CUDA SDK samples
 #include <time.h>
 #include <curand_kernel.h>
 
-#include <helper_image.h>
 #include <matrix.h>
 #include "nvmatrix_kernels.cuh"
 #include "nvmatrix_operators.cuh"
 
+#include <helper_cuda.h>
+
 #include <iostream>
 
 using namespace std;
+
+
+#ifdef  USE_NVTX
+#include "nvToolsExt.h"
+class Tracer {
+public:
+	Tracer(const char* name) {
+		nvtxRangePushA(name);
+	}
+	~Tracer() {
+		nvtxRangePop();
+	}
+};
+#define RANGE(name) Tracer uniq_name_using_macros(name);
+#else
+#define RANGE(name)
+#endif
+
 
 #ifdef WARNINGS
 #define WARN(msg) printf("WARN: File %s, line %d: %s\n", __FILE__, __LINE__, msg);
@@ -61,6 +82,9 @@ using namespace std;
 #define CURAND_CALL(x) do { if((x) != CURAND_STATUS_SUCCESS) { \
                             printf("Error at %s:%d\n",__FILE__,__LINE__);\
                             exit(EXIT_FAILURE);}} while(0)
+#ifndef MIN
+#define MIN(a,b) ((a < b) ? a : b)
+#endif
 
 class NVMatrix {
 protected:
@@ -70,6 +94,8 @@ protected:
     float* _devData;
     bool _isTrans;
     bool _ownsData;
+
+    static cusparseHandle_t _cusparseHandle;
 
 //    static std::map<int,curandGenerator_t> rndGen;
     static std::map<int,curandState*> rndDevStates;
@@ -82,6 +108,16 @@ protected:
             exit(EXIT_FAILURE);
         }
     }
+
+    static void setCusparseHandle(){
+    	if (_cusparseHandle == NULL){
+    		_cusparseHandle = 0;
+    	    cusparseStatus_t cusparseStatus;
+    	    cusparseStatus = cusparseCreate(&_cusparseHandle);
+    	    checkCudaErrors(cusparseStatus);
+    	}
+    }
+
 
     char getTransChar() const {
         /*
@@ -123,6 +159,11 @@ public:
         	return Matrix::DENSE;
     }
 
+    virtual bool hasNan();
+
+    static inline cusparseHandle_t getCusparseHandle(){
+    	return _cusparseHandle;
+    }
     /*
      * DO NOT DEREFERENCE IN HOST CODE! This is a device memory pointer.
      */
@@ -217,10 +258,14 @@ public:
     void copy(NVMatrix& dest) const;
     NVMatrix& copy() const;
     void addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis, float scaleAB);
+
+    //changed the order of the argument to support the sparse version of it more easily
+    virtual void addProductChanged( const NVMatrix &b, float scaleTarget, float scaleAB, NVMatrix &target) const;
+
     void addProduct(const NVMatrix& a, const NVMatrix &b);
-    void rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const;
-    void rightMult(const NVMatrix &b, NVMatrix &target) const;
-    void rightMult(const NVMatrix &b, float scaleAB);
+    virtual void rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const;
+    virtual void rightMult(const NVMatrix &b, NVMatrix &target) const;
+    virtual void rightMult(const NVMatrix &b, float scaleAB);
     void randomizeUniform();
     void addGaussianNoise(NVMatrix& stdevs, bool var, NVMatrix& target);
     void addGaussianNoise(float stdev, NVMatrix& target);
@@ -246,9 +291,9 @@ public:
     void _checkBounds(int startRow, int endRow, int startCol, int endCol) const;
     NVMatrix& slice(int startRow, int endRow, int startCol, int endCol) const;
     void slice(int startRow, int endRow, int startCol, int endCol, NVMatrix& target) const;
-    NVMatrix& sliceRows(int startRow, int endRow) const;
+    virtual NVMatrix& sliceRows(int startRow, int endRow) const;
     virtual void sliceRows(int startRow, int endRow, NVMatrix& target) const;
-    NVMatrix& sliceCols(int startCol, int endCol) const;
+    virtual NVMatrix& sliceCols(int startCol, int endCol) const;
     virtual void sliceCols(int startCol, int endCol, NVMatrix& target) const;
 
     template <class Op> void apply(Op op, NVMatrix& target) {
@@ -418,18 +463,18 @@ public:
     /*
      * Does SOFT transpose and returns result, leaving this matrix unchanged
      */
-    NVMatrix& getTranspose();
+    virtual NVMatrix& getTranspose();
 
     /*
      * Does HARD transpose and puts result in target
      */
-    void transpose(NVMatrix& target);
+    virtual void transpose(NVMatrix& target);
 
     /*
      * Does SOFT transpose
      */
-    void transpose();
-    bool transpose(bool trans);
+    virtual void transpose();
+    virtual bool transpose(bool trans);
 
     void flipTrans(NVMatrix& target);
     NVMatrix& flipTrans();

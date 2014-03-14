@@ -102,6 +102,7 @@ PyObject* startBatch(PyObject *self, PyObject *args) {
     MatrixV& mvec = *getMatrixV((PyObject*)data);
     
     TrainingWorker* wr = new TrainingWorker(*model, *new CPUData(mvec), test);
+
     model->getWorkerQueue().enqueue(wr);
     return Py_BuildValue("i", 0);
 }

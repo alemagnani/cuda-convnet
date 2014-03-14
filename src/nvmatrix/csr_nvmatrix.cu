@@ -1,9 +1,10 @@
 #include <csr_nvmatrix.cuh>
-
+#include <cusparse_v2.h>
 
 
 
 CsrNVMatrix::CsrNVMatrix() {
+	setCusparseHandle();
 	_csrColIndA = NULL;
 	_csrRowPtrA = NULL;
 
@@ -12,6 +13,20 @@ CsrNVMatrix::CsrNVMatrix() {
 	_nzz = 0;
 
 }
+
+CsrNVMatrix::CsrNVMatrix(float* devData,int* csrColInd, int* csrRowPtr,  int numRows, int numCols, int nzz): NVMatrix( devData, 1, nzz, 1, false) {
+	setCusparseHandle();
+	_nzz = nzz;
+	_numRows =  numRows;
+	_numCols = numCols;
+	_numElements = _numRows * _numCols;
+	_ownsDataColInd = false;
+	_ownsDataRowInd = false;
+	_csrColIndA = csrColInd;
+	_csrRowPtrA = csrRowPtr;
+	_isTrans = false;
+}
+
 
 CsrNVMatrix::~CsrNVMatrix() {
 	if (_ownsDataColInd && _numElements > 0) {
@@ -40,15 +55,15 @@ void CsrNVMatrix::copyFromHost(const CsrMatrix& hostMatrix) {
 	if (_nzz > 0) {
 		 cudaMemcpy(_devData, hostMatrix.getData(),
 				sizeof(float) * _nzz , cudaMemcpyHostToDevice);
-		 ERRORCHECK();
+		 //ERRORCHECK();
 
 		 cudaMemcpy( _csrColIndA, hostMatrix.getColInd(),
 				sizeof(int) * _nzz , cudaMemcpyHostToDevice);
-		 ERRORCHECK();
+		 //ERRORCHECK();
 
 		 cudaMemcpy(_csrRowPtrA, hostMatrix.getRowPtr(),
 				sizeof(int) * (getNumRows()+1) , cudaMemcpyHostToDevice);
-		 ERRORCHECK();
+		 //ERRORCHECK();
 	}
 }
 
@@ -130,4 +145,58 @@ bool CsrNVMatrix::resize(const CsrMatrix &like) {
 
 	}
 	return true;
+}
+
+/*
+ * Does SOFT transpose and returns result, leaving this matrix unchanged
+ */
+NVMatrix& CsrNVMatrix::getTranspose(){
+	throw string("Not implemented!");
+}
+
+/*
+ * Does HARD transpose and puts result in target
+ */
+void CsrNVMatrix::transpose(NVMatrix& target){
+	throw string("Not implemented!");
+}
+/*
+ * Does SOFT transpose
+ */
+void CsrNVMatrix::transpose(){
+	throw string("Not implemented!");
+}
+bool CsrNVMatrix::transpose(bool trans){
+	throw string("Not implemented!");
+}
+
+void CsrNVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const{
+	addProductChanged(b, 0, scaleAB, target);
+}
+
+
+
+
+void CsrNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float scaleAB, NVMatrix &target)const{
+	assert(_numCols == b.getNumRows());
+	if(&target != this) {
+		target.resize(_numRows, b.getNumCols());
+		target.setTrans(true);
+	}
+	assert(target.getNumRows() == _numRows);
+	assert(target.getNumCols() == b.getNumCols());
+
+	target.resize(_numRows, b.getNumCols());
+	target.setTrans(true);
+
+	cusparseStatus_t cusparseStatus = cusparseScsrmm2(NVMatrix::getCusparseHandle(), CUSPARSE_OPERATION_NON_TRANSPOSE ,CUSPARSE_OPERATION_TRANSPOSE,
+			getNumRows(), b.getNumCols(), getNumCols(),_nzz,
+			&scaleAB, CsrNVMatrix::getDescription(),
+			getDevData(), _csrRowPtrA, _csrColIndA,
+			b.getDevData(),  b.getLeadingDim() ,
+			&scaleTarget,
+			target.getDevData(), getNumRows());
+
+	checkCudaErrors(cusparseStatus);
+
 }

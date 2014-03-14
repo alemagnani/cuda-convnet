@@ -33,6 +33,7 @@
 #include <matrix.h>
 #include <convnet.cuh>
 #include <util.cuh>
+#include <cuda_runtime.h>
 
 using namespace std;
 
@@ -48,8 +49,9 @@ ConvNet::ConvNet(PyListObject* layerParams, int minibatchSize, int deviceID) : T
         for (int i = 0; i < numLayers; i++) {
             PyObject* paramsDict = PyList_GET_ITEM(layerParams, i);
             string layerType = pyDictGetString(paramsDict, "type");
-            
+
             Layer* l = initLayer(layerType, paramsDict);
+            printf("layer created %s, %s\n",layerType.c_str(), l->getName().c_str());
             // Connect backward links in graph for this layer
             intv* inputLayers = pyDictGetIntV(paramsDict, "inputs");
             if (inputLayers != NULL) {
@@ -141,6 +143,7 @@ void ConvNet::initCuda() {
     cudaSetDevice(_deviceID < 0 ? gpuGetMaxGflopsDeviceId() : _deviceID);
     cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
     cublasInit();
+
 
     randomSeedEnv = getenv("CONVNET_RANDOM_SEED");
     if (randomSeedEnv != NULL) {

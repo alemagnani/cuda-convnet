@@ -24,6 +24,7 @@
 
 import numpy as n
 import numpy.random as nr
+import scikit_learn_wrapper
 from util import *
 from data import *
 from options import *
@@ -198,6 +199,7 @@ class ConvNet(IGPUModel):
         DataProvider.register_data_provider('cifar', 'CIFAR', CIFARDataProvider)
         DataProvider.register_data_provider('dummy-cn-n', 'Dummy ConvNet', DummyConvNetDataProvider)
         DataProvider.register_data_provider('cifar-cropped', 'Cropped CIFAR', CroppedCIFARDataProvider)
+        DataProvider.register_data_provider('dp_scikit', 'train-test split scikit learn', scikit_learn_wrapper.ScikitDataProvider)
         
         return op
     
@@ -206,5 +208,6 @@ if __name__ == "__main__":
     op = ConvNet.get_options_parser()
 
     op, load_dic = IGPUModel.parse_options(op)
+    print 'load dict is {}'.format(load_dic)
     model = ConvNet(op, load_dic)
     model.start()

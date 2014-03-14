@@ -135,13 +135,13 @@ class DummyConvNetDataProvider(LabeledDummyDataProvider):
 
             sparse_matrix = csc_matrix(dic['data'])
             rows, cols = sparse_matrix.shape
-            print 'rows: {}, cols{}, type: {}'.format(rows, cols, type(sparse_matrix))
-            print 'indices: {}, row ptr: {}'.format(sparse_matrix.indices.shape, sparse_matrix.indptr.shape )
+            #print 'rows: {}, cols{}, type: {}'.format(rows, cols, type(sparse_matrix))
+            #print 'indices: {}, row ptr: {}'.format(sparse_matrix.indices.shape, sparse_matrix.indptr.shape )
             this_data = [sparse_matrix.data, sparse_matrix.indices, sparse_matrix.indptr, rows, cols]
         else:
             this_data = dic['data']
         dic['labels'] = n.require(dic['labels'].T, requirements='C')
-        
+        print "the labels have shape {}".format(dic['labels'].shape)
         return epoch, batchnum, [this_data, dic['labels']]
     
     # Returns the dimensionality of the two data matrices returned by get_next_batch

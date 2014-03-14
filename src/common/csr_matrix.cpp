@@ -28,11 +28,11 @@ void readPythonArray(const PyArrayObject *src, int** data, long int& entries,
 		bool& ownsData) {
 	int num_dims = PyArray_NDIM(src);
 	int item_size = PyArray_ITEMSIZE(src);
-	cout << "\nnumber of dimensions: " << num_dims << " item size: " << item_size <<"\n";
+	//cout << "\nnumber of dimensions: " << num_dims << " item size: " << item_size <<"\n";
 
 	entries = PyArray_DIM(src, 0);
 
-	cout << "\nrows: " << entries  << "\n\n";
+	//cout << "\nrows: " << entries  << "\n\n";
 
 	if (src->flags & NPY_CONTIGUOUS || src->flags & NPY_FORTRAN) {
 		*data = (int*) src->data;
@@ -47,17 +47,15 @@ void readPythonArray(const PyArrayObject *src, int** data, long int& entries,
 	}
 }
 
-#ifdef NUMPY_INTERFACE
 CsrMatrix::CsrMatrix(const PyArrayObject *data, const PyArrayObject * csrColInd, const PyArrayObject * csrRowPtr, long int numRows, long int numCols ) : Matrix(data) {
 	_updateDims(numRows, numCols);
 
-	cout << "\ninitializing csr matrix. Is trans:" << isTrans() << "numRows: " << numRows << " numCOls: " << numCols << "\n";
+	//cout << "\ninitializing csr matrix. Is trans:" << isTrans() << "numRows: " << numRows << " numCOls: " << numCols << "\n";
 
 	readPythonArray(csrColInd, & _csrColInd, _nzz, _ownsDataColInd);
 	long int tmp = 0;
 	readPythonArray(csrRowPtr, & _csrRowPtr, tmp, _ownsDataRowInd);
 }
-#endif
 
 CsrMatrix::~CsrMatrix() {
 	if (this->_csrColInd != NULL && this->_ownsDataColInd) {

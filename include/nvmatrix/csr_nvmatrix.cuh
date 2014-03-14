@@ -13,17 +13,7 @@
 #include "sparse_nvmatrix_kernels.cuh"
 #include "nvmatrix_kernels.cuh"
 
-#define ERRORCHECK() cErrorCheck(__FILE__, __LINE__)
 
-inline void cErrorCheck(const char *file, int line) {
-  cudaThreadSynchronize();
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    printf("Error: %s\n", cudaGetErrorString(err));
-    printf(" @ %s: %d\n", file, line);
-    exit(-1);
-  }
-}
 
 class CsrNVMatrix : public NVMatrix {
 protected:
@@ -35,10 +25,14 @@ protected:
 	 bool _ownsDataColInd;
 	 bool _ownsDataRowInd;
 
+	 static cusparseMatDescr_t _descr;
+
 public:
 	 CsrNVMatrix();
 
     ~CsrNVMatrix();
+
+    CsrNVMatrix(float* devData,int* csrColInd, int* csrRowPtr,  int numRows, int numCols, int nzz);
 
     bool resize(const CsrMatrix &like);
 
@@ -46,7 +40,44 @@ public:
     void copyFromHost(const Matrix& hostMatrix);
     void copyFromHost(const Matrix& hostMatrix, bool resizeDeviceMatrix);
 
+    virtual void addProductChanged( const NVMatrix &b, float scaleTarget, float scaleAB, NVMatrix &target) const;
+
+    virtual void rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const;
+
+    static cusparseMatDescr_t getDescription(){
+       	if (_descr == NULL){
+       			cusparseStatus_t cusparseStatus = cusparseCreateMatDescr(&_descr);
+       			checkCudaErrors(cusparseStatus);
+       			cusparseSetMatType(_descr,CUSPARSE_MATRIX_TYPE_GENERAL);
+       			cusparseSetMatIndexBase(_descr,CUSPARSE_INDEX_BASE_ZERO);
+       		}
+       		return _descr;
+       }
+
+
+    /*
+     * Does SOFT transpose and returns result, leaving this matrix unchanged
+     */
+    virtual NVMatrix& getTranspose();
+
+    /*
+     * Does HARD transpose and puts result in target
+     */
+    virtual void transpose(NVMatrix& target);
+
+    /*
+     * Does SOFT transpose
+     */
+    virtual void transpose();
+    virtual bool transpose(bool trans);
+
+
     void sliceRows(int startRow, int endRow, NVMatrix& target) const {
+
+    	 if (target.getNumRows() != (endRow = startRow)|| target.getNumCols() != getNumCols()) {
+    	    	        target.resize((endRow = startRow), getNumCols());
+    	    	 }
+
     	target.scale(0.0);
     	dim3 blocks(std::min(NUM_BLOCKS_MAX, endRow-startRow));
     	dim3 threads(ELTWISE_THREADS_X);

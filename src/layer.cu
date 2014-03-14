@@ -33,6 +33,9 @@
 #include <cudaconv2.cuh>
 #include <matrix.h>
 
+
+
+
 using namespace std;
 
 /* 
@@ -60,6 +63,8 @@ Layer::Layer(ConvNet* convNet, PyObject* paramsDict, bool trans) :
 }
 
 void Layer::fpropNext(PASS_TYPE passType) {
+	string t = string("fpropNext ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     for (int i = 0; i < _next.size(); i++) {
         _next[i]->fprop(passType);
     }
@@ -76,6 +81,8 @@ void Layer::truncBwdActs() {
 }
 
 void Layer::fprop(PASS_TYPE passType) {
+	string t = string("fprop ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     _rcvdFInputs += 1;
     if (_rcvdFInputs == _prev.size()) {
         NVMatrixV v;
@@ -93,6 +100,8 @@ void Layer::fprop(NVMatrix& v, PASS_TYPE passType) {
 }
 
 void Layer::fprop(NVMatrixV& v, PASS_TYPE passType) {
+	string t = string("fprop core ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     assert(v.size() == _prev.size());
     _inputs.clear();
     _inputs.insert(_inputs.begin(), v.begin(), v.end());
@@ -129,6 +138,8 @@ void Layer::fprop(NVMatrixV& v, PASS_TYPE passType) {
 }
 
 void Layer::bprop(PASS_TYPE passType) {
+	string t = string("bprop ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     if (_rcvdBInputs == _numGradProducersNext) {
         _rcvdBInputs++; // avoid doing bprop computation twice
         bprop(getActsGrad(), passType);
@@ -258,6 +269,7 @@ NVMatrix& Layer::getActsGrad() {
  */
 NeuronLayer::NeuronLayer(ConvNet* convNet, PyObject* paramsDict) 
     : Layer(convNet, paramsDict, true) {
+	//printf("creating neural network layer!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     _neuron = &Neuron::makeNeuron(PyDict_GetItemString(paramsDict, "neuron"));
 }
 
@@ -323,6 +335,8 @@ WeightLayer::WeightLayer(ConvNet* convNet, PyObject* paramsDict, bool trans, boo
 }
 
 void WeightLayer::bpropCommon(NVMatrix& v, PASS_TYPE passType) {
+	string t = string("bpropCommon ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     if (_biases->getEps() > 0) {
         bpropBiases(v, passType);
     }
@@ -336,6 +350,8 @@ void WeightLayer::bpropCommon(NVMatrix& v, PASS_TYPE passType) {
 }
 
 void WeightLayer::updateWeights() {
+	string t = string("updateWeights ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     _weights.update();
     _biases->update();
 }
@@ -372,6 +388,19 @@ FCLayer::FCLayer(ConvNet* convNet, PyObject* paramsDict) : WeightLayer(convNet, 
 }
 
 void FCLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
+	string t = string("fpropActs ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
+
+	NVMatrix& inp = *_inputs[inpIdx];
+	/*
+	if (inp.hasNan()){
+			printf("\nthe matrix with size %d %d has nan, sum %f \n", inp.getNumRows(), inp.getNumCols(),inp.sum());
+	}else{
+		printf("\nthe matrix with size %d %d has NO nan, sum %f \n", inp.getNumRows(), inp.getNumCols(),inp.sum());
+	}
+	*/
+	//inp.print(0,inp.getNumRows(),0, inp.getNumCols());
+
     getActs().addProduct(*_inputs[inpIdx], *_weights[inpIdx], scaleTargets, 1);
     if (scaleTargets == 0) {
         getActs().addVector(_biases->getW());
@@ -379,6 +408,8 @@ void FCLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
 }
 
 void FCLayer::bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, PASS_TYPE passType) {
+	string t = string("bpropActs ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     NVMatrix& weights_T = _weights[inpIdx].getW().getTranspose();
     _prev[inpIdx]->getActsGrad().addProduct(v, weights_T, scaleTargets, 1);
     delete &weights_T;
@@ -391,6 +422,8 @@ void FCLayer::bpropBiases(NVMatrix& v, PASS_TYPE passType) {
 }
 
 void FCLayer::bpropWeights(NVMatrix& v, int inpIdx, PASS_TYPE passType) {
+	string t = string("bpropWeights ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     int numCases = v.getNumRows();
 
     NVMatrix& prevActs_T = _prev[inpIdx]->getActs().getTranspose();
@@ -602,11 +635,17 @@ SoftmaxLayer::SoftmaxLayer(ConvNet* convNet, PyObject* paramsDict) : Layer(convN
 }
 
 void SoftmaxLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
+	string t = string("fpropActs ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     NVMatrix& input = *_inputs[0];
+    //printf("printing input");
+    //input.print(0,input.getNumRows(), 0, input.getNumCols());
     NVMatrix& max = input.max(1);
     input.addVector(max, -1, getActs());
+
     getActs().apply(NVMatrixOps::Exp());
     NVMatrix& sum = getActs().sum(1);
+
     getActs().eltwiseDivideByVector(sum);
     
     delete &max;
@@ -614,6 +653,8 @@ void SoftmaxLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType)
 }
 
 void SoftmaxLayer::bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, PASS_TYPE passType) {
+	string t = string("bpropActs ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     assert(inpIdx == 0);
     bool doLogregGrad = _next.size() == 1 && _next[0]->getType() == "cost.logreg";
     if (doLogregGrad) {
@@ -979,6 +1020,8 @@ LogregCostLayer::LogregCostLayer(ConvNet* convNet, PyObject* paramsDict) : CostL
 }
 
 void LogregCostLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
+	string t = string("fpropActs ") +_type+ string( " , ")+ _name;
+	RANGE( t.c_str())
     // This layer uses its two inputs together
     if (inpIdx == 0) {
         NVMatrix& labels = *_inputs[0];
@@ -987,12 +1030,16 @@ void LogregCostLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passTy
         NVMatrix& trueLabelLogProbs = getActs(), correctProbs;
         computeLogregCost(labels, probs, trueLabelLogProbs, correctProbs);
         _costv.clear();
+        //cout << "logprobsum: " << trueLabelLogProbs.sum() << "\n";
+		//cout << "correctprobs: " << correctProbs.sum() << "\n";
         _costv.push_back(-trueLabelLogProbs.sum());
         _costv.push_back(numCases - correctProbs.sum());
     }
 }
 
 void LogregCostLayer::bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, PASS_TYPE passType) {
+	string t = string("bpropActs ") +_type+ string( " , ")+ _name;
+		RANGE( t.c_str())
     assert(inpIdx == 1);
     NVMatrix& labels = _prev[0]->getActs();
     NVMatrix& probs = _prev[1]->getActs();

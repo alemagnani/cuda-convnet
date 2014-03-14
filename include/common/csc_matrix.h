@@ -9,16 +9,18 @@
 #define CSC_MATRIX_H_
 
 #include <matrix_funcs.h>
-#ifdef NUMPY_INTERFACE
 #include <Python.h>
 #include <arrayobject.h>
-#endif
 #include <limits>
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <matrix.h>
+
+#include <iostream>
+
+using namespace std;
 
 extern "C" {
 #include <cblas.h>
@@ -38,9 +40,7 @@ private:
 public:
     CscMatrix();
     CscMatrix(long int numRows, long int numCols);
-#ifdef NUMPY_INTERFACE
     CscMatrix(const PyArrayObject *data, const PyArrayObject *cscRowIndA, const PyArrayObject *cscColPtrA, long int numRows, long int numCols );
-#endif
     ~CscMatrix();
 
     inline long int get_non_zeros() const{
@@ -58,6 +58,12 @@ public:
     inline MATRIX_TYPE get_type() const {
         	return CSC;
         }
+
+    inline long int getNumDataBytes() const {
+    	  cout << "\ngetting right size\n";
+          return _nzz * (sizeof(MTYPE) + sizeof(int)) + sizeof(int) *( getNumCols()+1);
+      }
+
 };
 
 

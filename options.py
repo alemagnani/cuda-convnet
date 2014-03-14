@@ -137,9 +137,15 @@ class OptionsParser:
         long_opts = ["%s=" % self.options[name].letter for name in self.options if len(self.options[name].letter) > 1]
         (go, ga) = getopt(sys.argv[1:], short_opt_str, longopts=long_opts)
         dic = dict(go)
+
+        print 'dic is : {}'.format(dic)
         
+        return self.parse_from_dictionary(dic, eval_expr_defaults=eval_expr_defaults)
+
+    def parse_from_dictionary(self, dictionary, eval_expr_defaults=False):
+        dic = dictionary
         for o in self.get_options_list(sort_order=self.SORT_EXPR_LAST):
-            if o.prefixed_letter in dic:  
+            if o.prefixed_letter in dic:
                 o.set_value(dic[o.prefixed_letter])
             else:
                 # check if excused or has default
@@ -156,6 +162,8 @@ class OptionsParser:
         if eval_expr_defaults:
             self.eval_expr_defaults()
         return self.options
+
+
     
     def merge_from(self, op2):
         """Merges the options in op2 into this instance, but does not overwrite
