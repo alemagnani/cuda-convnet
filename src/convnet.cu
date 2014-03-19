@@ -32,10 +32,12 @@
 #include <nvmatrix_operators.cuh>
 #include <matrix.h>
 #include <convnet.cuh>
+#include <cuda_setup.cuh>
 #include <util.cuh>
 #include <cuda_runtime.h>
 
 using namespace std;
+
 
 /* 
  * =======================
@@ -142,8 +144,7 @@ void ConvNet::initCuda() {
 
     cudaSetDevice(_deviceID < 0 ? gpuGetMaxGflopsDeviceId() : _deviceID);
     cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
-    cublasInit();
-
+    cudaSetup::CudaStart();
 
     randomSeedEnv = getenv("CONVNET_RANDOM_SEED");
     if (randomSeedEnv != NULL) {
@@ -339,3 +340,4 @@ bool ConvNet::checkGradient(const string& name, float eps, Weights& weights) {
     _numFailures += fail;
     return fail;
 }
+

@@ -192,7 +192,7 @@ def main():
 
         print 'type if x is {}'.format(type(X))
 
-    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=5)
+    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=20)
 
 
 

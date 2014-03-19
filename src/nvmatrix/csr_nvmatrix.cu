@@ -172,6 +172,7 @@ bool CsrNVMatrix::transpose(bool trans){
 }
 
 void CsrNVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const{
+	cout << "right mul CSR\n";
 	addProductChanged(b, 0, scaleAB, target);
 }
 
@@ -179,6 +180,7 @@ void CsrNVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) 
 
 
 void CsrNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float scaleAB, NVMatrix &target)const{
+	cout << "addproduct changed CSR\n";
 	assert(_numCols == b.getNumRows());
 	if(&target != this) {
 		target.resize(_numRows, b.getNumCols());
@@ -190,9 +192,9 @@ void CsrNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float
 	target.resize(_numRows, b.getNumCols());
 	target.setTrans(true);
 
-	cusparseStatus_t cusparseStatus = cusparseScsrmm2(CudaState::instance()->cusparseHandle(), CUSPARSE_OPERATION_NON_TRANSPOSE ,CUSPARSE_OPERATION_TRANSPOSE,
+	cusparseStatus_t cusparseStatus = cusparseScsrmm2(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_NON_TRANSPOSE ,CUSPARSE_OPERATION_TRANSPOSE,
 			getNumRows(), b.getNumCols(), getNumCols(),_nzz,
-			&scaleAB, CudaState::instance()->cusparseDescr(),
+			&scaleAB, cudaSetup::_sparseDescr,
 			getDevData(), _csrRowPtrA, _csrColIndA,
 			b.getDevData(),  b.getLeadingDim() ,
 			&scaleTarget,

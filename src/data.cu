@@ -85,6 +85,20 @@ GPUData& DataProvider::getDataSlice(int startCase, int endCase) {
     NVMatrixV& miniData = *new NVMatrixV();
     
     for (int i = 0; i < _hData->getData().size(); i++) {
+    	if (_data[i]->get_type() == Matrix::SPARSE){
+    		if (_dataSize < MAX_DATA_ON_GPU) {
+    		            if (_data[i]->isTrans()) {
+    		                throw string("not supported");
+    		            } else {
+    		            	cout << "pushing the sparse slice in\n";
+    		            	miniData.push_back(&_data[i]->sliceCols(startCase, min(_hData->getNumCases(), endCase)));
+    		            	cout << "done pushing the sparse slice in\n";
+    		            }
+    		        } else {
+    		        	throw string("sparse is not supported if it doesn't fit in the device");
+    		        }
+
+    	}else{
         miniData.push_back(new NVMatrix());
         if (_dataSize < MAX_DATA_ON_GPU) {
             if (_data[i]->isTrans()) {
@@ -101,6 +115,7 @@ GPUData& DataProvider::getDataSlice(int startCase, int endCase) {
             }
             miniData.back()->copyFromHost(tmp, true);
         }
+    	}
     }
 
     return *new GPUData(miniData);

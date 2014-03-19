@@ -400,7 +400,7 @@ void FCLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
 	}
 	*/
 	//inp.print(0,inp.getNumRows(),0, inp.getNumCols());
-
+	cout << "doing fpropActs FC layer\n";
     getActs().addProduct(*_inputs[inpIdx], *_weights[inpIdx], scaleTargets, 1);
     if (scaleTargets == 0) {
         getActs().addVector(_biases->getW());

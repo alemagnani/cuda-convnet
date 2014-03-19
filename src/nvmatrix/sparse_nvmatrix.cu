@@ -5,87 +5,94 @@
 #include "nvmatrix.cuh"
 #include "cuda_setup.cuh"
 
-CscNVMatrix::CscNVMatrix() {
-	_cscRowInd = NULL;
-	_cscColPtr = NULL;
+SparseNVMatrix::SparseNVMatrix() {
+	_sparseInd = NULL;
+	_sparsePtr = NULL;
 
-	_ownsDataRowInd = true;
-	_ownsDataColPtr = true;
+	_ownsDataInd = true;
+	_ownsDataPtr = true;
 	_nzz = 0;
+	_sparse_type = Matrix::CSC;
 
 }
 
-CscNVMatrix::~CscNVMatrix() {
-	if (_ownsDataRowInd && _numElements > 0) {
-		cublasStatus status = cublasFree(_cscRowInd);
+SparseNVMatrix::~SparseNVMatrix() {
+	if (_ownsDataInd && _numElements > 0) {
+		cublasStatus status = cublasFree(_sparseInd);
 		if (status != CUBLAS_STATUS_SUCCESS) {
-			fprintf(stderr, "!!!! memory free error on _cscRowInd\n");
+			fprintf(stderr, "!!!! memory free error on _sparseInd\n");
 			exit(EXIT_FAILURE);
 		}
 	}
-	if (_ownsDataColPtr && _numElements > 0) {
-		cublasStatus status = cublasFree(_cscColPtr);
+	if (_ownsDataPtr && _numElements > 0) {
+		cublasStatus status = cublasFree(_sparsePtr);
 		if (status != CUBLAS_STATUS_SUCCESS) {
-			fprintf(stderr, "!!!! memory free error on _cscColPtr\n");
+			fprintf(stderr, "!!!! memory free error on _sparsePtr\n");
 			exit(EXIT_FAILURE);
 		}
 	}
 
 }
 
-CscNVMatrix::CscNVMatrix(float* devData,int* cscRowInd, int* cscColPtr,  int numRows, int numCols, int nzz) : NVMatrix( devData, 1, nzz,  1, false) {
+SparseNVMatrix::SparseNVMatrix(float* devData,int* sparseInd, int* sparsePtr,  int numRows, int numCols, int nzz, Matrix::SPARSE_TYPE type) : NVMatrix( devData, 1, nzz,  1, false) {
 
 	_nzz = nzz;
 	_numRows =  numRows;
 	_numCols = numCols;
 	_numElements = _numRows * _numCols;
-	_ownsDataRowInd = false;
-	_ownsDataColPtr = false;
-	_cscRowInd = cscRowInd;
-	_cscColPtr = cscColPtr;
+	_ownsDataInd = false;
+	_ownsDataPtr = false;
+	_sparseInd = sparseInd;
+	_sparsePtr = sparsePtr;
 	_isTrans = false;
+	_sparse_type = type;
 }
 
-void CscNVMatrix::copyFromHost(const CscMatrix& hostMatrix) {
+void SparseNVMatrix::copyFromHost(const SparseMatrix& hostMatrix) {
 	assert(hostMatrix.get_non_zeros() == _nzz);
 	assert(isSameDims(hostMatrix));
-	setTrans(hostMatrix.isTrans());
+	assert(hostMatrix.get_sparse_type() = get_sparse_type())
 
 	if (_nzz > 0) {
 		cudaMemcpy(_devData, hostMatrix.getData(),
 				sizeof(float) * _nzz , cudaMemcpyHostToDevice);
 
-		cudaMemcpy(_cscRowInd, hostMatrix.getRowInd(),
+		cudaMemcpy(_sparseInd, hostMatrix.getSparseInd(),
 				sizeof(int) * _nzz , cudaMemcpyHostToDevice);
 
-		cudaMemcpy( _cscColPtr, hostMatrix.getColPtr(),
+		cudaMemcpy( _sparsePtr, hostMatrix.getSparsePtr(),
 				sizeof(int) * (getNumCols()+1) , cudaMemcpyHostToDevice);
 		//ERRORCHECK();
 	}
 }
 
 
-NVMatrix& CscNVMatrix::sliceCols(int startCol, int endCol) const{
+NVMatrix& SparseNVMatrix::sliceCols(int startCol, int endCol) const{
+
+	if (_sparse_type == Matrix::CSR){
+	    		throw string("CSR is not supported for column slicing");
+	 }
+
 	cout << "start col "<< startCol << " endcol: " << endCol << " rows: " << getNumRows() << " cols: " << getNumCols() <<"\n";
 	int begin;
-	read_one_entry<<<1,1>>>(_cscColPtr,startCol, &begin);
+	read_one_entry<<<1,1>>>(_sparsePtr,startCol, &begin);
 	cout << "begin" << begin <<"\n";
 	int end;
-	read_one_entry<<<1,1>>>(_cscColPtr,endCol, &end);
+	read_one_entry<<<1,1>>>(_sparsePtr,endCol, &end);
 	cout << "end" << end <<"\n";
 	const int nzz = end -begin;
-	cout << "the slice of csc as nzz " <<  nzz <<"\n";
-	return * new CscNVMatrix(_devData+begin,_cscRowInd +begin, _cscColPtr+ begin,  getNumRows(), (endCol-startCol), nzz);
+	cout << "the slice of sparse as nzz " <<  nzz <<"\n";
+	return * new SparseNVMatrix(_devData+begin,_sparseInd +begin, _sparsePtr+ begin,  getNumRows(), (endCol-startCol), nzz, Matrix::CSC);
 }
 
 
-void CscNVMatrix::copyFromHost(const Matrix& hostMatrix) {
-	copyFromHost((CscMatrix&) hostMatrix);
+void SparseNVMatrix::copyFromHost(const Matrix& hostMatrix) {
+	copyFromHost((SparseMatrix&) hostMatrix);
 }
-void CscNVMatrix::copyFromHost(const Matrix& hostMatrix,
+void SparseNVMatrix::copyFromHost(const Matrix& hostMatrix,
 		bool resizeDeviceMatrix) {
 	if (resizeDeviceMatrix) {
-		resize((CscMatrix&) hostMatrix);
+		resize((SparseMatrix&) hostMatrix);
 	}
 	copyFromHost(hostMatrix);
 
@@ -94,12 +101,12 @@ void CscNVMatrix::copyFromHost(const Matrix& hostMatrix,
 
 
 
-bool CscNVMatrix::resize(const CscMatrix &like) {
+bool SparseNVMatrix::resize(const SparseMatrix &like) {
 	bool reallocated = false;
 	if (like.get_non_zeros() != _nzz) {
 		assert(_ownsData);
-		assert(_ownsDataRowInd);
-		assert(_ownsDataColPtr);
+		assert(_ownsDataInd);
+		assert(_ownsDataPtr);
 
 		_numRows = like.getNumRows();
 		_numCols = like.getNumCols();
@@ -110,12 +117,12 @@ bool CscNVMatrix::resize(const CscMatrix &like) {
 				fprintf(stderr, "!!!! memory free error: %X\n", status);
 				exit(EXIT_FAILURE);
 			}
-			status = cublasFree(_cscRowInd);
+			status = cublasFree(_sparseInd);
 			if (status != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr, "!!!! memory free error: %X\n", status);
 				exit(EXIT_FAILURE);
 			}
-			status = cublasFree(_cscColPtr);
+			status = cublasFree(_sparsePtr);
 			if (status != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr, "!!!! memory free error: %X\n", status);
 				exit(EXIT_FAILURE);
@@ -131,13 +138,13 @@ bool CscNVMatrix::resize(const CscMatrix &like) {
 				fprintf(stderr, "!!!! device memory allocation error\n");
 				exit(EXIT_FAILURE);
 			}
-			status = cublasAlloc(_nzz, sizeof(int), (void**) &_cscRowInd);
+			status = cublasAlloc(_nzz, sizeof(int), (void**) &_sparseInd);
 			if (status != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr, "!!!! device memory allocation error\n");
 				exit(EXIT_FAILURE);
 			}
 			status = cublasAlloc( (like.getNumCols() + 1), sizeof(int),
-					(void**) &_cscColPtr);
+					(void**) &_sparsePtr);
 			if (status != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr, "!!!! device memory allocation error\n");
 				exit(EXIT_FAILURE);
@@ -145,8 +152,8 @@ bool CscNVMatrix::resize(const CscMatrix &like) {
 
 		} else {
 			_devData = NULL;
-			_cscRowInd = NULL;
-			_cscColPtr = NULL;
+			_sparseInd = NULL;
+			_sparsePtr = NULL;
 			_nzz = 0;
 		}
 		reallocated = true;
@@ -154,6 +161,7 @@ bool CscNVMatrix::resize(const CscMatrix &like) {
 		_numRows =  like.getNumRows();
 		_numCols = like.getNumCols();
 		_numElements = _numRows * _numCols;
+		_sparse_type = like.get_sparse_type();
 		_isTrans = false;
 
 	}
@@ -164,43 +172,45 @@ bool CscNVMatrix::resize(const CscMatrix &like) {
 /*
  * Does SOFT transpose and returns result, leaving this matrix unchanged
  */
-NVMatrix& CscNVMatrix::getTranspose(){
-	cout << "get transpose CSC\n";
-	return * new CsrNVMatrix(_devData,_cscRowInd, _cscColPtr,  getNumCols(), getNumRows(), _nzz);
+NVMatrix& SparseNVMatrix::getTranspose(){
+	return * new SparseNVMatrix(_devData,_sparseInd, _sparsePtr,   getNumRows(), getNumCols(), _nzz, (get_sparse_type == Matrix::CSR) ? Matrix::CSC : Matrix::CSR );
 }
 
 /*
  * Does HARD transpose and puts result in target
  */
-void CscNVMatrix::transpose(NVMatrix& target){
-	cout << "csc not implemented transpose with target args\n";
+void SparseNVMatrix::transpose(NVMatrix& target){
+	cout << "sparse not implemented transpose with target args\n";
 	throw string("Not implemented!");
 }
 /*
  * Does SOFT transpose
  */
-void CscNVMatrix::transpose(){
-	cout << "csc not implemented transpose\n";
-	throw string("Not implemented!");
+void SparseNVMatrix::transpose(){
+	if (_sparse_type == Matrix::CSC){
+		_sparse_type = Matrix::CSR;
+	}else{
+		_sparse_type = Matrix::CSC;
+	}
+	int numColsTmp = getNumCols();
+	_numCols = getNumROws();
+	_numRows = numColsTmp;
 }
-bool CscNVMatrix::transpose(bool trans){
-	if (trans){
 
-		cout << "csc not implemented transpose with bool arg\n";
-		throw string("Not implemented!");
+bool SparseNVMatrix::transpose(bool trans){
+	if (trans){
+//what exactly we are supposed to do TODO
+
 	}
 	return trans;
 }
-void CscNVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const{
-	cout << "right mul Csc\n";
+void SparseNVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const{
 	addProductChanged(b, 0, scaleAB, target);
 }
 
 
-
-
-void CscNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float scaleAB, NVMatrix &target)const{
-	cout << "addproduct changes CSC\n";
+void SparseNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float scaleAB, NVMatrix &target)const{
+	cout << "addproduct changes Sparse\n";
 	assert(_numCols == b.getNumRows());
 	if(&target != this) {
 		target.resize(_numRows, b.getNumCols());
@@ -215,7 +225,7 @@ void CscNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float
 	cusparseStatus_t cusparseStatus = cusparseScsrmm2(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE ,CUSPARSE_OPERATION_TRANSPOSE,
 			getNumCols(), b.getNumCols(), getNumRows(),_nzz,
 			&scaleAB, cudaSetup::_sparseDescr,
-			getDevData(), _cscColPtr, _cscRowInd,
+			getDevData(), _sparsePtr, _sparseInd,
 			b.getDevData(),  b.getLeadingDim() ,
 			&scaleTarget,
 			target.getDevData(), getNumRows());
@@ -224,8 +234,8 @@ void CscNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float
 
 }
 
-void CscNVMatrix::rightMult(const NVMatrix &b, float scaleAB){
-	throw string("rightMult Not implemented for CSC!");
+void SparseNVMatrix::rightMult(const NVMatrix &b, float scaleAB){
+	throw string("rightMult Not implemented for sparse!");
 }
 
 

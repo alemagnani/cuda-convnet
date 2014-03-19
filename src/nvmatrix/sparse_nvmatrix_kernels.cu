@@ -19,3 +19,7 @@ __global__  void slice_kernel(int start, int end, float * data, int* ind, int* p
 		}
 	}
 }
+
+__global__ void read_one_entry(int* array, int pos_to_read, int * read_value){
+	read_value[0] = array[pos_to_read];
+}
