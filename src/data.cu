@@ -26,8 +26,7 @@
 
 #include <algorithm>
 #include <data.cuh>
-#include "csr_nvmatrix.cuh"
-#include "csc_nvmatrix.cuh"
+#include "sparse_nvmatrix.cuh"
 
 using namespace std;
 
@@ -62,10 +61,8 @@ void DataProvider::setData(CPUData& hData) {
 
             	if (hData[i].get_type() == Matrix::DENSE){
             		_data.push_back(new NVMatrix());
-            	}else if (hData[i].get_type() == Matrix::CSR) {
-            		_data.push_back(new CsrNVMatrix());
-            	}else if (hData[i].get_type() == Matrix::CSC) {
-            	    _data.push_back(new CscNVMatrix());
+            	}else if (hData[i].get_type() == Matrix::SPARSE) {
+            		_data.push_back(new SparseNVMatrix());
             	}
             }
             _data[i]->copyFromHost(hData[i], true);

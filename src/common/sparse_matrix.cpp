@@ -13,7 +13,7 @@ SparseMatrix::SparseMatrix() {
 	_ownsDataInd = true;
 	_ownsDataPtr = true;
 
-	_sparse_type = NULL;
+	_sparse_type = SparseMatrix::CSC;
 
 }
 SparseMatrix::SparseMatrix(long int numRows, long int numCols) {
@@ -24,7 +24,7 @@ SparseMatrix::SparseMatrix(long int numRows, long int numCols) {
 	_ownsDataInd = true;
 	_ownsDataPtr = true;
 
-	_sparse_type = NULL;
+	_sparse_type = SparseMatrix::CSC;
 
 }
 
@@ -49,14 +49,14 @@ void readPythonArray(const PyArrayObject *src, int** data, long int& entries,
 }
 
 
-SparseMatrix::SparseMatrix(const PyArrayObject *data, const PyArrayObject * sparseInd, const PyArrayObject * sparsePtr, long int numRows, long int numCols ,Matrix::SPARSE_TYPE sparse_type) : Matrix(data) {
+SparseMatrix::SparseMatrix(const PyArrayObject *data, const PyArrayObject * sparseInd, const PyArrayObject * sparsePtr, long int numRows, long int numCols , SparseMatrix::SPARSE_TYPE sparse_type) : Matrix(data) {
 	_updateDims(numRows, numCols);
 
 	readPythonArray(sparseInd, & _sparseInd, _nzz, _ownsDataInd);
 	long int tmp = 0;
 	readPythonArray(sparsePtr, & _sparsePtr, tmp, _ownsDataPtr);
 
-	_sparse_type = sprase_type;
+	_sparse_type = sparse_type;
 }
 
 SparseMatrix::~SparseMatrix() {

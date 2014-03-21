@@ -71,6 +71,7 @@ def _expand(matrix):
     if isinstance(matrix, csr_matrix):
         rows, cols = matrix.shape
         print "matrix output has size {}, {}".format(cols,rows)
+     
         return [np.require(matrix.data, dtype=np.float32, requirements='C'),np.require( matrix.indices, dtype=np.int32, requirements='C'), np.require(matrix.indptr, dtype=np.int32, requirements='C'), cols, rows]
     else:
         print 'working with a dense matrix'

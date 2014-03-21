@@ -27,6 +27,13 @@ extern "C" {
 }
 
 class SparseMatrix : public Matrix  {
+
+public:
+
+    enum SPARSE_TYPE {
+   	        CSR, CSC
+   	    };
+
 private:
     int* _sparseInd;
     int* _sparsePtr;
@@ -36,18 +43,15 @@ private:
     bool _ownsDataInd;
     bool _ownsDataPtr;
 
-    Matrix::SPARSE_TYPE _sparse_type;
+    SPARSE_TYPE _sparse_type;
 
 
 public:
 
-    enum SPARSE_TYPE {
-   	        CSR, CSC
-   	    };
 
     SparseMatrix();
     SparseMatrix(long int numRows, long int numCols);
-    SparseMatrix(const PyArrayObject *data, const PyArrayObject *sparseInd, const PyArrayObject *sparsePtr, long int numRows, long int numCols, Matrix::SPARSE_TYPE sparse_type );
+    SparseMatrix(const PyArrayObject *data, const PyArrayObject *sparseInd, const PyArrayObject *sparsePtr, long int numRows, long int numCols, SPARSE_TYPE sparse_type );
     ~SparseMatrix();
 
     inline long int get_non_zeros() const{

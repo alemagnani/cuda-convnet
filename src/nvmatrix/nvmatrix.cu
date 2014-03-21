@@ -128,7 +128,7 @@ NVMatrix::~NVMatrix() {
     if(_ownsData && _numElements > 0) {
         cublasStatus status = cublasFree(_devData);
         if (status != CUBLAS_STATUS_SUCCESS) {
-            fprintf(stderr, "!!!! memory free error\n");
+            fprintf(stderr, "!!!! memory free error on delete nv matrix\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -227,6 +227,7 @@ void NVMatrix::rightMult(const NVMatrix &b, NVMatrix& target) const {
  */
 void NVMatrix::addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis, float scaleAB) {
 
+	cout << "a type: " << a.get_type() << ", b type: " << b.get_type() << "\n\n";
 
     if (scaleThis == 0) {
     	//printf("right mul with scale 0-------------------------\n");
@@ -496,7 +497,7 @@ bool NVMatrix::resize(int numRows, int numCols) {
             if (_numElements > 0) { // free old memory
                 cublasStatus status = cublasFree(_devData);
                 if (status != CUBLAS_STATUS_SUCCESS) {
-                    fprintf(stderr, "!!!! memory free error: %X\n", status);
+                    fprintf(stderr, "!!!! memory free error on resize nvmatrix: %X\n", status);
                     exit(EXIT_FAILURE);
                 }
             }
