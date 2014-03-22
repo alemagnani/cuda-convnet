@@ -102,6 +102,7 @@ Cost& Cost::operator /= (const double v) {
 
 Cost::~Cost() {
     for (CostMap::const_iterator it = _costMap.begin(); it != _costMap.end(); ++it) {
+    	//cout << "cost delete \n";
         delete it->second;
     }
 }

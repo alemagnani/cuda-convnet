@@ -38,6 +38,7 @@
 #include <nvmatrix.cuh>
 #include <nvmatrix_operators.cuh>
 #include <map>
+#include <execinfo.h>
 
 using namespace std;
 
@@ -128,6 +129,21 @@ NVMatrix::~NVMatrix() {
     if(_ownsData && _numElements > 0) {
         cublasStatus status = cublasFree(_devData);
         if (status != CUBLAS_STATUS_SUCCESS) {
+        	{
+        	void *array[10];
+        	  size_t size;
+
+        	  // get void*'s for all entries on the stack
+        	  size = backtrace(array, 10);
+
+        	  // print out all the frames to stderr
+        	  fprintf(stderr, "Error: signal %d:\n");
+        	  backtrace_symbols_fd(array, size, STDERR_FILENO);
+        	}
+
+
+        	cout << "status " << status << "\n";
+        	cout << "type of matrix failing " << get_type() << " rows: " << getNumRows() << " cols " << getNumCols() << "\n";
             fprintf(stderr, "!!!! memory free error on delete nv matrix\n");
             exit(EXIT_FAILURE);
         }
@@ -227,7 +243,9 @@ void NVMatrix::rightMult(const NVMatrix &b, NVMatrix& target) const {
  */
 void NVMatrix::addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis, float scaleAB) {
 
-	cout << "a type: " << a.get_type() << ", b type: " << b.get_type() << "\n\n";
+	//cout << "a type: " << a.get_type() << ", b type: " << b.get_type() << "\n\n";
+	//cout << "a size " << a.getNumRows() << " , " << a.getNumCols() << "\n";
+	//cout << "b size " << b.getNumRows() << " , " << b.getNumCols() << "\n";
 
     if (scaleThis == 0) {
     	//printf("right mul with scale 0-------------------------\n");

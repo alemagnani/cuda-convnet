@@ -71,7 +71,7 @@ def _expand(matrix):
     if isinstance(matrix, csr_matrix):
         rows, cols = matrix.shape
         print "matrix output has size {}, {}".format(cols,rows)
-     
+
         return [np.require(matrix.data, dtype=np.float32, requirements='C'),np.require( matrix.indices, dtype=np.int32, requirements='C'), np.require(matrix.indptr, dtype=np.int32, requirements='C'), cols, rows]
     else:
         print 'working with a dense matrix'
@@ -143,7 +143,7 @@ def main():
 
     (opts, args) = op.parse_args()
 
-    newsgroup = False
+    newsgroup = True
     if newsgroup:
         categories = [
             'alt.atheism',
@@ -193,7 +193,7 @@ def main():
 
         print 'type if x is {}'.format(type(X))
 
-    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=20)
+    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=2)
 
 
 

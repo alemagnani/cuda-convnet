@@ -102,6 +102,7 @@ void Layer::fprop(NVMatrix& v, PASS_TYPE passType) {
 void Layer::fprop(NVMatrixV& v, PASS_TYPE passType) {
 	string t = string("fprop core ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
+	//cout << " fprop\n";
     assert(v.size() == _prev.size());
     _inputs.clear();
     _inputs.insert(_inputs.begin(), v.begin(), v.end());
@@ -147,6 +148,7 @@ void Layer::bprop(PASS_TYPE passType) {
 }
 
 void Layer::bprop(NVMatrix& v, PASS_TYPE passType) {
+	//cout << "bprop\n";
     v.transpose(_trans);
     for (int i = 0; i < _prev.size(); i++) {
         _prev[i]->getActs().transpose(_trans);
@@ -400,7 +402,7 @@ void FCLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
 	}
 	*/
 	//inp.print(0,inp.getNumRows(),0, inp.getNumCols());
-	cout << "doing fpropActs FC layer\n";
+	//cout << "doing fpropActs FC layer\n";
     getActs().addProduct(*_inputs[inpIdx], *_weights[inpIdx], scaleTargets, 1);
     if (scaleTargets == 0) {
         getActs().addVector(_biases->getW());
@@ -410,8 +412,10 @@ void FCLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
 void FCLayer::bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, PASS_TYPE passType) {
 	string t = string("bpropActs ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
+	//cout << "bpropActs FC\n";
     NVMatrix& weights_T = _weights[inpIdx].getW().getTranspose();
     _prev[inpIdx]->getActsGrad().addProduct(v, weights_T, scaleTargets, 1);
+    //cout << "deleting weight_T in bpropActs FC\n";
     delete &weights_T;
 }
 
@@ -422,6 +426,7 @@ void FCLayer::bpropBiases(NVMatrix& v, PASS_TYPE passType) {
 }
 
 void FCLayer::bpropWeights(NVMatrix& v, int inpIdx, PASS_TYPE passType) {
+	//cout << "	bpropWeights FC\n";
 	string t = string("bpropWeights ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
     int numCases = v.getNumRows();
@@ -431,8 +436,9 @@ void FCLayer::bpropWeights(NVMatrix& v, int inpIdx, PASS_TYPE passType) {
     float scaleGrad = passType == PASS_GC ? 1 : _weights[inpIdx].getEps() / numCases;
     
     _weights[inpIdx].getInc().addProduct(prevActs_T, v, scaleInc, scaleGrad);
-    
+    //cout << "deletinig in fc prevact\n";
     delete &prevActs_T;
+    //cout << "done deleting\n";
 }
 
 /* 
@@ -638,17 +644,21 @@ void SoftmaxLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType)
 	string t = string("fpropActs ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
     NVMatrix& input = *_inputs[0];
+
+	//cout << "input in softmax is of type " << input.get_type() << " rows "<< input.getNumRows() << "cols " << input.getNumCols() << "\n";
     //printf("printing input");
     //input.print(0,input.getNumRows(), 0, input.getNumCols());
     NVMatrix& max = input.max(1);
+    //cout << "softmax getActs type: " << getActs().get_type() << " rows: " << getActs().getNumRows() << "cols: " << getActs().getNumCols() << "\n";
     input.addVector(max, -1, getActs());
 
     getActs().apply(NVMatrixOps::Exp());
     NVMatrix& sum = getActs().sum(1);
 
     getActs().eltwiseDivideByVector(sum);
-    
+    //cout << "delete max\n";
     delete &max;
+    //cout << "delete sum\n";
     delete &sum;
 }
 

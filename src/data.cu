@@ -40,6 +40,7 @@ GPUData& DataProvider::operator[](int idx) {
 }
 
 void DataProvider::clearData() {
+	cout << "delete hdata in data.cu\n";
     delete _hData;
     _hData = NULL;
     _dataSize = 0;
