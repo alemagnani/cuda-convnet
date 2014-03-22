@@ -132,7 +132,7 @@ public:
     };
 
     enum MATRIX_TYPE {
-        DENSE, SPARSE, CSR, CSC
+        DENSE, SPARSE
     };
 
     Matrix();

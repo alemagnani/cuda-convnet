@@ -31,113 +31,113 @@
 using namespace std;
 
 DataProvider::DataProvider(int minibatchSize) : 
-    _minibatchSize(minibatchSize), _hData(NULL) {
+    		_minibatchSize(minibatchSize), _hData(NULL) {
 
 }
 
 GPUData& DataProvider::operator[](int idx) {
-    return getMinibatch(idx);
+	return getMinibatch(idx);
 }
 
 void DataProvider::clearData() {
 	cout << "delete hdata in data.cu\n";
-    delete _hData;
-    _hData = NULL;
-    _dataSize = 0;
+	delete _hData;
+	_hData = NULL;
+	_dataSize = 0;
 }
 
 void DataProvider::setData(CPUData& hData) {
-    // This is now deleted by the DataWorker's destructor
-//    delete _hData; // Delete old CPU matrices
+	// This is now deleted by the DataWorker's destructor
+	//    delete _hData; // Delete old CPU matrices
 
-    _hData = &hData;
-    _dataSize = 0;
-    for (int i = 0; i < hData.getSize(); i++) {
-        _dataSize += hData[i].getNumDataBytes();
-    }
-    _dataSize /= 1024 * 1024;
-    if (_dataSize < MAX_DATA_ON_GPU) {
-        for (int i = 0; i < hData.getSize(); i++) {
-            if (i >= _data.size()) {
+	_hData = &hData;
+	_dataSize = 0;
+	for (int i = 0; i < hData.getSize(); i++) {
+		_dataSize += hData[i].getNumDataBytes();
+	}
+	_dataSize /= 1024 * 1024;
+	if (_dataSize < MAX_DATA_ON_GPU) {
+		for (int i = 0; i < hData.getSize(); i++) {
+			if (i >= _data.size()) {
 
-            	if (hData[i].get_type() == Matrix::DENSE){
-            		_data.push_back(new NVMatrix());
-            	}else if (hData[i].get_type() == Matrix::SPARSE) {
-            		_data.push_back(new SparseNVMatrix());
-            	}
-            }
-            _data[i]->copyFromHost(hData[i], true);
-        }
-    }
+				if (hData[i].get_type() == Matrix::DENSE){
+					_data.push_back(new NVMatrix());
+				}else if (hData[i].get_type() == Matrix::SPARSE) {
+					_data.push_back(new SparseNVMatrix());
+				}
+			}
+			_data[i]->copyFromHost(hData[i], true);
+		}
+	}
 }
 
 GPUData& DataProvider::getMinibatch(int idx) {
-    assert(idx >= 0 && idx < getNumMinibatches());
-    return getDataSlice(idx * _minibatchSize, (idx + 1) * _minibatchSize);
+	assert(idx >= 0 && idx < getNumMinibatches());
+	return getDataSlice(idx * _minibatchSize, (idx + 1) * _minibatchSize);
 }
 
 GPUData& DataProvider::getDataSlice(int startCase, int endCase) {
-    assert(_hData != NULL);
-    assert(_hData->getNumCases() > 0);
-    
-    NVMatrixV& miniData = *new NVMatrixV();
-    
-    for (int i = 0; i < _hData->getData().size(); i++) {
-    	if (_data[i]->get_type() == Matrix::SPARSE){
-    		if (_dataSize < MAX_DATA_ON_GPU) {
-    		            if (_data[i]->isTrans()) {
-    		                throw string("not supported");
-    		            } else {
-    		            	cout << "pushing the sparse slice in\n";
-    		            	miniData.push_back(&_data[i]->sliceCols(startCase, min(_hData->getNumCases(), endCase)));
-    		            	cout << "done pushing the sparse slice in\n";
-    		            }
-    		        } else {
-    		        	throw string("sparse is not supported if it doesn't fit in the device");
-    		        }
+	assert(_hData != NULL);
+	assert(_hData->getNumCases() > 0);
 
-    	}else{
-        miniData.push_back(new NVMatrix());
-        if (_dataSize < MAX_DATA_ON_GPU) {
-            if (_data[i]->isTrans()) {
-                _data[i]->sliceRows(startCase, min(_hData->getNumCases(), endCase), *miniData[i]);
-            } else {
-                _data[i]->sliceCols(startCase, min(_hData->getNumCases(), endCase), *miniData[i]);
-            }
-        } else {
-            Matrix tmp;
-            if ((*_hData)[i].isTrans()) {
-                (*_hData)[i].sliceRows(startCase, min(_hData->getNumCases(), endCase), tmp);
-            } else {
-                (*_hData)[i].sliceCols(startCase, min(_hData->getNumCases(), endCase), tmp);
-            }
-            miniData.back()->copyFromHost(tmp, true);
-        }
-    	}
-    }
+	NVMatrixV& miniData = *new NVMatrixV();
 
-    return *new GPUData(miniData);
+	for (int i = 0; i < _hData->getData().size(); i++) {
+		if (_data[i]->get_type() == Matrix::SPARSE){
+			if (_dataSize < MAX_DATA_ON_GPU) {
+				if (_data[i]->isTrans()) {
+					throw string("not supported");
+				} else {
+					//cout << "pushing the sparse slice in\n";
+					miniData.push_back(&_data[i]->sliceCols(startCase, min(_hData->getNumCases(), endCase)));
+					//cout << "done pushing the sparse slice in\n";
+				}
+			} else {
+				throw string("sparse is not supported if it doesn't fit in the device");
+			}
+
+		}else{
+			miniData.push_back(new NVMatrix());
+			if (_dataSize < MAX_DATA_ON_GPU) {
+				if (_data[i]->isTrans()) {
+					_data[i]->sliceRows(startCase, min(_hData->getNumCases(), endCase), *miniData[i]);
+				} else {
+					_data[i]->sliceCols(startCase, min(_hData->getNumCases(), endCase), *miniData[i]);
+				}
+			} else {
+				Matrix tmp;
+				if ((*_hData)[i].isTrans()) {
+					(*_hData)[i].sliceRows(startCase, min(_hData->getNumCases(), endCase), tmp);
+				} else {
+					(*_hData)[i].sliceCols(startCase, min(_hData->getNumCases(), endCase), tmp);
+				}
+				miniData.back()->copyFromHost(tmp, true);
+			}
+		}
+	}
+
+	return *new GPUData(miniData);
 }
 
 int DataProvider::getNumMinibatches() {
-    assert(_hData != NULL);
-    assert(_hData->getNumCases() > 0);
-    return DIVUP(_hData->getNumCases(), _minibatchSize);
+	assert(_hData != NULL);
+	assert(_hData->getNumCases() > 0);
+	return DIVUP(_hData->getNumCases(), _minibatchSize);
 }
 
 int DataProvider::getMinibatchSize() {
-    return _minibatchSize;
+	return _minibatchSize;
 }
 
 int DataProvider::getNumCases() {
-    assert(_hData != NULL);
-    assert(_hData->getNumCases() > 0);
-    return _hData->getNumCases();
+	assert(_hData != NULL);
+	assert(_hData->getNumCases() > 0);
+	return _hData->getNumCases();
 }
 
 int DataProvider::getNumCasesInMinibatch(int idx) {
-    assert(_hData != NULL);
-    assert(_hData->getNumCases() > 0);
-    assert(idx >= 0 && idx < getNumMinibatches());
-    return min(_minibatchSize, max(0, _hData->getNumCases() - idx * _minibatchSize));
+	assert(_hData != NULL);
+	assert(_hData->getNumCases() > 0);
+	assert(idx >= 0 && idx < getNumMinibatches());
+	return min(_minibatchSize, max(0, _hData->getNumCases() - idx * _minibatchSize));
 }

@@ -47,6 +47,8 @@ public:
 	void copyFromHost(const Matrix& hostMatrix);
 	void copyFromHost(const Matrix& hostMatrix, bool resizeDeviceMatrix);
 
+	virtual void copyToHost(Matrix& hostMatrix) const;
+
 	inline SparseMatrix::SPARSE_TYPE get_sparse_type() const {
 		return _sparse_type;
 	}

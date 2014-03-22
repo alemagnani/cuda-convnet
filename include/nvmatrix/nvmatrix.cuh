@@ -240,7 +240,7 @@ public:
 
     virtual void copyFromHost(const Matrix& hostMatrix);
     virtual void copyFromHost(const Matrix& hostMatrix, bool resizeDeviceMatrix);
-    void copyToHost(Matrix& hostMatrix) const;
+    virtual void copyToHost(Matrix& hostMatrix) const;
     void copyToHost(Matrix& hostMatrix, bool resizeTarget) const;
     void copy(NVMatrix& dest) const;
     NVMatrix& copy() const;
