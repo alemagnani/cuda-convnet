@@ -143,7 +143,7 @@ def main():
 
     (opts, args) = op.parse_args()
 
-    newsgroup = False
+    newsgroup = True
     if newsgroup:
         categories = [
             'alt.atheism',
@@ -171,7 +171,7 @@ def main():
         # define a pipeline combining a text feature extractor with a simple
         # classifier
         pipeline = Pipeline([
-            ('vect', CountVectorizer()),
+            ('vect', CountVectorizer(max_features=1000)),
             ('tfidf', TfidfTransformer())
         ])
 
@@ -193,7 +193,7 @@ def main():
 
         print 'type if x is {}'.format(type(X))
 
-    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=200)
+    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=50)
 
 
 

@@ -270,7 +270,7 @@ void NVMatrix::addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis,
     			scaleAB, a.getDevData(), a.getLeadingDim(), b.getDevData(), b.getLeadingDim(),
     			scaleThis, _devData, getLeadingDim());
     	checkCublasError("cublasSgemm failed");
-    }else if (a.get_type() == Matrix::CSR || a.get_type() == Matrix::CSC) {
+    }else if (a.get_type() == Matrix::SPARSE ) {
     	a.addProductChanged(b,scaleThis, scaleAB, *this);
     }
 
@@ -633,6 +633,10 @@ void NVMatrix::add(NVMatrix& b, float scaleA, float scaleB, NVMatrix& target) {
         b.scale(scaleB, target);
         return;
     }
+    cout << "type b " << b.get_type() << " type target: " << target.get_type() << "\n\n";
+    assert(b.getNumCols() == target.getNumCols());
+    assert(b.getNumRows() == target.getNumRows());
+
     if (scaleA == 1 && scaleB == 1) { // slight optimization
         applyBinary(NVMatrixBinaryOps::Add(), b, target);
     } else {

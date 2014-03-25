@@ -48,6 +48,7 @@ public:
 	void copyFromHost(const Matrix& hostMatrix, bool resizeDeviceMatrix);
 
 	virtual void copyToHost(Matrix& hostMatrix) const;
+	virtual void copyToHost(Matrix& hostMatrix, bool resizeTarget) const;
 
 	inline SparseMatrix::SPARSE_TYPE get_sparse_type() const {
 		return _sparse_type;
@@ -123,7 +124,9 @@ public:
 		return Matrix::SPARSE;
 	}
 
-
+	virtual int getLeadingDim() const {
+	        return _sparse_type == SparseMatrix::CSR ? _numRows : _numCols;
+	}
 
 
 };

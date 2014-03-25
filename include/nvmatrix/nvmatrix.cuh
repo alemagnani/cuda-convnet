@@ -48,6 +48,7 @@
 #include <helper_cuda.h>
 
 #include <iostream>
+#include <execinfo.h>
 
 using namespace std;
 
@@ -181,7 +182,7 @@ public:
         return _stride;
     }
 
-    int getLeadingDim() const {
+    virtual int getLeadingDim() const {
         return _isTrans ? _numRows : _numCols;
     }
 
@@ -241,7 +242,7 @@ public:
     virtual void copyFromHost(const Matrix& hostMatrix);
     virtual void copyFromHost(const Matrix& hostMatrix, bool resizeDeviceMatrix);
     virtual void copyToHost(Matrix& hostMatrix) const;
-    void copyToHost(Matrix& hostMatrix, bool resizeTarget) const;
+    virtual void copyToHost(Matrix& hostMatrix, bool resizeTarget) const;
     void copy(NVMatrix& dest) const;
     NVMatrix& copy() const;
     void addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis, float scaleAB);
@@ -325,8 +326,23 @@ public:
                     std::min(NUM_BLOCKS_MAX, DIVUP(height, ELTWISE_THREADS_Y)));
         dim3 threads(ELTWISE_THREADS_X, ELTWISE_THREADS_Y);
         if (target.isTrans() == isTrans() && target.isTrans() == b.isTrans()) {
+
             kEltwiseBinaryOp<Op><<<blocks, threads>>>(_devData, b._devData, target._devData, height, width, getStride(),
                                                       b.getStride(), target.getStride(), op);
+            /*
+            {
+                    	void *array[10];
+                    	  size_t size;
+
+                    	  // get void*'s for all entries on the stack
+                    	  size = backtrace(array, 10);
+
+                    	  // print out all the frames to stderr
+                    	  fprintf(stderr, "Error: signal %d:\n");
+                    	  backtrace_symbols_fd(array, size, STDERR_FILENO);
+                    	}
+                    	*/
+
             getLastCudaError("kEltwiseBinaryOp: Kernel execution failed");
         } else {
             //  both x here since y divides x

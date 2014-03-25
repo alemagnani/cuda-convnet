@@ -75,7 +75,7 @@ public:
     }
 
     inline long int getNumDataBytes() const {
-    	  cout << "\ngetting right size\n";
+    	  //cout << "\ngetting right size\n";
           return _nzz * (sizeof(MTYPE) + sizeof(int)) + sizeof(int) *( getNumCols()+1);
       }
 
