@@ -127,6 +127,7 @@ NVMatrix::NVMatrix(float* devData, int numRows, int numCols, int stride, bool is
 
 NVMatrix::~NVMatrix() {
     if(_ownsData && _numElements > 0) {
+    	cout << "freeing matrices for dense matrix" << get_type() <<"\n\n";
         cublasStatus status = cublasFree(_devData);
         if (status != CUBLAS_STATUS_SUCCESS) {
         	{
@@ -633,7 +634,7 @@ void NVMatrix::add(NVMatrix& b, float scaleA, float scaleB, NVMatrix& target) {
         b.scale(scaleB, target);
         return;
     }
-    cout << "type b " << b.get_type() << " type target: " << target.get_type() << "\n\n";
+    //cout << "type b " << b.get_type() << " type target: " << target.get_type() << "\n\n";
     assert(b.getNumCols() == target.getNumCols());
     assert(b.getNumRows() == target.getNumRows());
 

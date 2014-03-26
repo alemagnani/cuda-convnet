@@ -397,8 +397,8 @@ void FCLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
 
 	NVMatrix& inp = *_inputs[inpIdx];
 
-	  cout << "\nprinting input fc\n";
-	  inp.print(3,3);
+	  //cout << "\nprinting input fc\n";
+	  //inp.print(3,3);
 
 	/*
 	if (inp.hasNan()){
@@ -425,8 +425,9 @@ void FCLayer::bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, PASS_TYPE p
 	//cout << "bpropActs FC\n";
     NVMatrix& weights_T = _weights[inpIdx].getW().getTranspose();
     _prev[inpIdx]->getActsGrad().addProduct(v, weights_T, scaleTargets, 1);
-    //cout << "deleting weight_T in bpropActs FC\n";
+    cout << "deleting weight_T in bpropActs FC\n";
     delete &weights_T;
+    cout << "done deleting\n";
 }
 
 void FCLayer::bpropBiases(NVMatrix& v, PASS_TYPE passType) {
@@ -454,9 +455,9 @@ void FCLayer::bpropWeights(NVMatrix& v, int inpIdx, PASS_TYPE passType) {
     //cout << "\ninc after\n";
     //_weights[inpIdx].getInc().print(3,3);
 
-    //cout << "deletinig in fc prevact\n";
+    cout << "deletinig in fc prevact\n";
     delete &prevActs_T;
-    //cout << "done deleting\n";
+    cout << "done deleting\n";
 }
 
 /* 
@@ -678,7 +679,7 @@ void SoftmaxLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType)
     getActs().eltwiseDivideByVector(sum);
     //cout << "output softmax\n";
     //getActs().print(3,3);
-
+    cudaThreadSynchronize();
     //cout << "delete max\n";
     delete &max;
     //cout << "delete sum\n";

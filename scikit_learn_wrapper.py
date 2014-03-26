@@ -171,7 +171,7 @@ def main():
         # define a pipeline combining a text feature extractor with a simple
         # classifier
         pipeline = Pipeline([
-            ('vect', CountVectorizer(max_features=1000)),
+            ('vect', CountVectorizer(max_features=300)),
             ('tfidf', TfidfTransformer())
         ])
 
@@ -180,7 +180,14 @@ def main():
         permutation = range(X.shape[0])
         random.shuffle(permutation)
 
+        #permutation = permutation[0:15]
+
         X = X[permutation]
+
+        #print X.indices
+        #print X.indptr
+        #print X.data
+
         y = y[permutation]
 
         print "X type is {}".format(type(X))
@@ -190,6 +197,7 @@ def main():
         X = iris.data  # we only take the first two features.
         y = iris.target
         X = csr_matrix(X)
+
 
         print 'type if x is {}'.format(type(X))
 
