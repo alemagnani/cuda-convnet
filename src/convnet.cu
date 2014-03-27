@@ -167,6 +167,18 @@ void* ConvNet::run() {
     return NULL;
 }
 
+void ConvNet::stopCuda() {
+	cout << "stopping cuda!!!\n";
+	cudaSetup::CudaStop();
+	cudaDeviceReset();
+}
+
+
+void* ConvNet::stop() {
+	stopCuda();
+	return NULL;
+}
+
 Queue<Worker*>& ConvNet::getWorkerQueue() {
     return _workerQueue;
 }

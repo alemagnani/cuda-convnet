@@ -162,6 +162,7 @@ class IGPUModel:
         self.cleanup()
     
     def cleanup(self):
+        self.libmodel.stopModel();
         sys.exit(0)
         
     def sync_with_host(self):

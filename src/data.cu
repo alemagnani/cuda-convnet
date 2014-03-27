@@ -81,9 +81,10 @@ GPUData& DataProvider::getDataSlice(int startCase, int endCase) {
 	assert(_hData->getNumCases() > 0);
 
 	NVMatrixV& miniData = *new NVMatrixV();
+	bool useDenseSlicing = false;
 
 	for (int i = 0; i < _hData->getData().size(); i++) {
-		if (_data[i]->get_type() == Matrix::SPARSE){
+		if (_data[i]->get_type() == Matrix::SPARSE and ! useDenseSlicing){
 			if (_dataSize < MAX_DATA_ON_GPU) {
 				if (_data[i]->isTrans()) {
 					throw string("not supported");

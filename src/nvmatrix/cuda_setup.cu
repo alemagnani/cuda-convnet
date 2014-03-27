@@ -15,6 +15,7 @@ cusparseMatDescr_t  _sparseDescr;
 void CudaStart()
 {
 	if (!_cudaInitialized) {
+		std::cout << "initizlizin cusparse\n\n";
 		cusparseStatus_t cusparseStatus = cusparseCreate(&_cusparseHandle);
 		if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) {
 			std::cout << "CUSPARSE initialization failed" << std::endl;

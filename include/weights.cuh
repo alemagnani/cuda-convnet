@@ -80,9 +80,11 @@ public:
         delete _hWeights;
         delete _hWeightsInc;
         if (_srcWeights == NULL) {
+        	cout << "deleting weights\n";
             delete _weights;
             delete _weightsInc;
             delete _weightsGrad;
+            cout << "done deleting weights\n";
         }
     }
 

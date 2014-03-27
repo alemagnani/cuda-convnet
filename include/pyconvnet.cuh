@@ -39,6 +39,7 @@ PyObject* checkGradients(PyObject *self, PyObject *args);
 PyObject* syncWithHost(PyObject *self, PyObject *args);
 PyObject* startMultiviewTest(PyObject *self, PyObject *args);
 PyObject* startFeatureWriter(PyObject *self, PyObject *args);
+PyObject* stopModel(PyObject *self, PyObject *args);
 
 #endif	/* PYCONVNET3_CUH */
 

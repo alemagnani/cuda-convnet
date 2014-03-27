@@ -127,7 +127,7 @@ NVMatrix::NVMatrix(float* devData, int numRows, int numCols, int stride, bool is
 
 NVMatrix::~NVMatrix() {
     if(_ownsData && _numElements > 0) {
-    	cout << "freeing matrices for dense matrix" << get_type() <<"\n\n";
+    	//cout << "freeing matrices for dense matrix" << get_type() <<"\n\n";
         cublasStatus status = cublasFree(_devData);
         if (status != CUBLAS_STATUS_SUCCESS) {
         	{

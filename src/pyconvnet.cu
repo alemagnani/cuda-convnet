@@ -51,6 +51,7 @@ static PyMethodDef _ConvNetMethods[] = {  { "initModel",          initModel,    
                                               { "startMultiviewTest", startMultiviewTest, METH_VARARGS },
                                               { "startFeatureWriter",  startFeatureWriter,         METH_VARARGS },
                                               { "syncWithHost",       syncWithHost,       METH_VARARGS },
+                                              { "stopModel",       stopModel,       METH_NOARGS },
                                               { NULL, NULL }
 };
 
@@ -86,6 +87,13 @@ PyObject* initModel(PyObject *self, PyObject *args) {
     model->start();
     return Py_BuildValue("i", 0);
 }
+
+PyObject* stopModel(PyObject *self, PyObject *args){
+	model->cancel();
+	return Py_BuildValue("i", 0);
+}
+
+
 
 /*
  * Starts training/testing on the given batch (asynchronous -- returns immediately).

@@ -31,6 +31,9 @@
 #include <errno.h>
 #include <assert.h>
 
+#include <iostream>
+using namespace std;
+
 /*
  * Abstract joinable thread class.
  * The only thing the implementer has to fill in is the run method.
@@ -44,10 +47,12 @@ private:
     static void* start_pthread_func(void *obj) {
         void* retval = reinterpret_cast<Thread*>(obj)->run();
         pthread_exit(retval);
+        cout << "\nrun of thread returned!!!!"<<  retval  <<"\n";
         return retval;
     }
 protected:
     virtual void* run() = 0;
+    virtual void* stop() = 0;
 public:
     Thread(bool joinable) : _joinable(joinable), _startable(true) {
         pthread_attr_init(&_pthread_attr);
@@ -55,6 +60,7 @@ public:
     }
 
     virtual ~Thread() {
+    	cout << "\nthread deleted!!!!\n";
     }
 
     pthread_t start() {
@@ -75,6 +81,11 @@ public:
             errno = n;
             perror("pthread_join error");
         }
+    }
+
+    void cancel(){
+    	pthread_cancel(_threadID);
+    	this->stop();
     }
 
     void join() {

@@ -258,7 +258,7 @@ void SparseNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, fl
 		if (b.isTrans()){
 
 			//cout << "new implementation col by col";
-
+			/*
 			sparseMult(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE,
 							getNumCols(), b.getNumCols(), getNumRows(),_nzz,
 							&scaleAB, cudaSetup::_sparseDescr,
@@ -266,9 +266,9 @@ void SparseNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, fl
 							b.getDevData(),  b.getLeadingDim() ,
 							&scaleTarget,
 							target.getDevData(), getNumRows());
+			*/
 
 
-			/*
 			cusparseStatus_t cusparseStatus = cusparseScsrmm(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE ,
 							getNumCols(), b.getNumCols(), getNumRows(),_nzz,
 							&scaleAB, cudaSetup::_sparseDescr,
@@ -277,7 +277,7 @@ void SparseNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, fl
 							&scaleTarget,
 							target.getDevData(), getNumRows());
 			checkCudaErrors(cusparseStatus);
-			*/
+
 
 		}else{
 		cusparseStatus_t cusparseStatus = cusparseScsrmm2(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE ,b.isTrans()?CUSPARSE_OPERATION_NON_TRANSPOSE: CUSPARSE_OPERATION_TRANSPOSE,

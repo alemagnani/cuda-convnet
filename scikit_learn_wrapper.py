@@ -8,7 +8,7 @@ from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.pipeline import Pipeline
 import convnet
-
+from sklearn.linear_model import SGDClassifier
 from data import DataProvider, DataProviderException
 from sklearn.cross_validation import train_test_split
 from optparse import OptionParser
@@ -69,6 +69,7 @@ def _adjust_labels(labels):
 
 def _expand(matrix):
     if isinstance(matrix, csr_matrix):
+        check_correct_indeces(matrix)
         rows, cols = matrix.shape
         print "matrix output has size {}, {}".format(cols,rows)
 
@@ -171,7 +172,7 @@ def main():
         # define a pipeline combining a text feature extractor with a simple
         # classifier
         pipeline = Pipeline([
-            ('vect', CountVectorizer(max_features=300)),
+            ('vect', CountVectorizer(max_features=300000)),
             ('tfidf', TfidfTransformer())
         ])
 
@@ -183,14 +184,11 @@ def main():
         #permutation = permutation[0:15]
 
         X = X[permutation]
-
-        #print X.indices
-        #print X.indptr
         #print X.data
 
         y = y[permutation]
 
-        print "X type is {}".format(type(X))
+        print "X type is {}, {}".format(type(X), X.shape)
 
     else:
         iris = datasets.load_iris()
@@ -201,11 +199,48 @@ def main():
 
         print 'type if x is {}'.format(type(X))
 
-    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=50)
-
-
+    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=5)
+    #print 'fitting'
+    #net =  SGDClassifier(loss="hinge", penalty="l2",  n_iter=50, verbose=10)
+    #print 'done fitting'
 
     net.fit(X, y)
+
+def check_correct_indeces(X):
+
+    ind = X.indices
+    ptr = X.indptr
+    data = X.data
+
+    for k in xrange(len(ptr)-1):
+        s = set()
+        begin = ptr[k]
+        end = ptr[k+1]
+
+        idx   = np.argsort(ind[begin:end])
+        ind[begin:end] = ind[begin:end][idx]
+        data[begin:end] = data[begin:end][idx]
+
+
+        #print 'k: {}, begin: {}, end: {}'.format(k, begin,end)
+        if end < begin:
+            print 'beging in wrong order with end ptr: {}'.format(ptr)
+            exit(-1)
+
+        previous_ni = -1
+        for j in range(begin,end):
+            ni = ind[j]
+            if ni < previous_ni:
+                print 'indeces ont in order ni: {}, previous: {}, j: {}'.format(ni, previous_ni, j)
+                print ind[begin:end]
+                exit(-1)
+            else:
+                previous_ni = ni
+            if ni in s:
+                print 'problem with repeating indeces'
+                exit(-1)
+            else:
+                s.add(ni)
 
 
 if __name__ == "__main__":

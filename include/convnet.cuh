@@ -68,7 +68,9 @@ protected:
     
     virtual Layer* initLayer(string& layerType, PyObject* paramsDict);
     void initCuda();
+    void stopCuda();
     void* run();
+    void* stop();
 public:
     ConvNet(PyListObject* layerParams, int minibatchSize, int deviceID);
     
