@@ -2,6 +2,7 @@
 #include <sparse_nvmatrix.cuh>
 #include <cusparse_v2.h>
 #include "nvmatrix.cuh"
+#include "sparse_matrix.h"
 #include "cuda_setup.cuh"
 
 SparseNVMatrix::SparseNVMatrix() {
@@ -12,11 +13,11 @@ SparseNVMatrix::SparseNVMatrix() {
 	_ownsDataPtr = true;
 	_nzz = 0;
 	_sparse_type = SparseMatrix::CSC;
+	_hostmatrix = NULL;
 
 }
 
 SparseNVMatrix::~SparseNVMatrix() {
-	//cout << "sparse delete\n";
 	if (_ownsDataInd && _numElements > 0) {
 		cout << "freeing indeces for sparse matrix \n\n";
 		cublasStatus status = cublasFree(_sparseInd);
@@ -48,6 +49,7 @@ SparseNVMatrix::SparseNVMatrix(float* devData,int* sparseInd, int* sparsePtr,  i
 	_sparsePtr = sparsePtr;
 	_isTrans = false;
 	_sparse_type = type;
+	_hostmatrix = NULL;
 }
 
 void SparseNVMatrix::copyFromHost(const SparseMatrix& hostMatrix) {
@@ -66,34 +68,41 @@ void SparseNVMatrix::copyFromHost(const SparseMatrix& hostMatrix) {
 				sizeof(int) * ( (get_sparse_type() == SparseMatrix::CSC ?getNumCols() : getNumRows())+1) , cudaMemcpyHostToDevice));
 
 	}
+	_hostmatrix =  & hostMatrix;
 }
 
 
 NVMatrix& SparseNVMatrix::sliceCols(int startCol, int endCol) const{
-	//cout << "slicing cols with no target\n\n";
+	string t = string("sparse soft slice");
+	RANGE( t.c_str())
 	if (_sparse_type == SparseMatrix::CSR){
 		throw string("CSR is not supported for column slicing");
 	}
-
-	//cout << "start col "<< startCol << " endcol: " << endCol << " rows: " << getNumRows() << " cols: " << getNumCols() << " nzz: "<< _nzz <<"\n";
 	int begin=0;
-	int* d_answer;
-	checkCudaErrors(cudaMalloc(&d_answer, sizeof(int)));
-
-	read_one_entry<<<1,1>>>(_sparsePtr,startCol, d_answer);
-	checkCudaErrors(cudaMemcpy(&begin, d_answer, sizeof(int), cudaMemcpyDeviceToHost));
-
 	int end=0;
-	read_one_entry<<<1,1>>>(_sparsePtr,endCol, d_answer);
-	checkCudaErrors(cudaMemcpy(&end, d_answer, sizeof(int), cudaMemcpyDeviceToHost));
-	checkCudaErrors(cudaFree(d_answer));
-	//cudaThreadSynchronize();
-	//cout << "begin" << begin <<"\n";
-	//cout << "end" << end <<"\n";
+	if (_hostmatrix != NULL){
+		//cout << " using available host matrix to find begin and end indices\n";
+		begin = _hostmatrix->getSparsePtr()[startCol];
+		end = _hostmatrix->getSparsePtr()[endCol];
+	}else{
+		int* d_answer;
+		checkCudaErrors(cudaMalloc(&d_answer, sizeof(int)));
+
+		read_one_entry<<<1,1>>>(_sparsePtr,startCol, d_answer);
+		checkCudaErrors(cudaMemcpy(&begin, d_answer, sizeof(int), cudaMemcpyDeviceToHost));
+
+
+		read_one_entry<<<1,1>>>(_sparsePtr,endCol, d_answer);
+		checkCudaErrors(cudaMemcpy(&end, d_answer, sizeof(int), cudaMemcpyDeviceToHost));
+		checkCudaErrors(cudaFree(d_answer));  //i think this synchronize so no synchronization needed
+	}
 	const int nzz = end -begin;
-	//cout << "the slice of sparse as nzz " <<  nzz << " the old nzz was "<< _nzz << " start col "<< startCol <<"\n";
 	return * new SparseNVMatrix(_devData,_sparseInd , _sparsePtr+ startCol,  getNumRows(), (endCol-startCol), nzz, SparseMatrix::CSC);
 }
+
+
+
+
 
 
 void SparseNVMatrix::copyFromHost(const Matrix& hostMatrix) {
@@ -109,7 +118,6 @@ void SparseNVMatrix::copyFromHost(const Matrix& hostMatrix,
 
 
 bool SparseNVMatrix::resize(const SparseMatrix &like) {
-	//cout << "resize data of sparse matrix\n";
 	bool reallocated = false;
 	if (like.get_non_zeros() != _nzz) {
 		assert(_ownsData);
@@ -120,7 +128,6 @@ bool SparseNVMatrix::resize(const SparseMatrix &like) {
 		_numCols = like.getNumCols();
 
 		if (_nzz > 0) { // free old memory
-			//cout << "clearing memory from old psarse matrix during resize\n";
 			cublasStatus status = cublasFree(_devData);
 			if (status != CUBLAS_STATUS_SUCCESS) {
 				fprintf(stderr, "!!!! memory free error during resize: %X\n", status);
@@ -184,7 +191,6 @@ bool SparseNVMatrix::resize(const SparseMatrix &like) {
  * Does SOFT transpose and returns result, leaving this matrix unchanged
  */
 NVMatrix& SparseNVMatrix::getTranspose(){
-	//cout << "get transpose of sparse " << get_sparse_type() << "\n";
 	return * new SparseNVMatrix(_devData,_sparseInd, _sparsePtr,   getNumCols(), getNumRows(), _nzz, (get_sparse_type() == SparseMatrix::CSR) ? SparseMatrix::CSC : SparseMatrix::CSR );
 }
 
@@ -192,7 +198,6 @@ NVMatrix& SparseNVMatrix::getTranspose(){
  * Does HARD transpose and puts result in target
  */
 void SparseNVMatrix::transpose(NVMatrix& target){
-	//cout << "sparse not implemented transpose with target args\n";
 	throw string("Not implemented!");
 }
 /*
@@ -212,22 +217,18 @@ void SparseNVMatrix::transpose(){
 bool SparseNVMatrix::transpose(bool trans){
 	bool oldTrans = get_sparse_type() == SparseMatrix::CSR;
 	if (oldTrans != trans) {
-		//cout << "doing transpose for sparse with bool argument\n";
 		transpose();
 	}
 	return oldTrans;
 }
 void SparseNVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) const{
-	//cout << "right multiplication for sparse " << get_sparse_type() << "\n";
 	addProductChanged(b, 0, scaleAB, target);
 }
 
 
 void SparseNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, float scaleAB, NVMatrix &target)const{
-	//cout << "addproduct changes Sparse\n";
 	assert(_numCols == b.getNumRows());
 	if(scaleTarget == 0.0) {
-		//cout << "target is zero\n";
 		target.resize(_numRows, b.getNumCols());
 		target.setTrans(true);
 	}else{
@@ -237,62 +238,32 @@ void SparseNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, fl
 	assert(target.getNumCols() == b.getNumCols());
 	assert(_numCols == b.getNumRows());
 
-	//cout << "this:"<< getNumRows()<< ", "<< getNumCols()<< " b: "<<  b.getNumRows()<< ", "<< b.getNumCols() << " target:"<< target.getNumRows()<< ", "<< target.getNumCols()<< " nzz: "<< _nzz<<"\n";
-	//cout << "b leading " <<  b.getLeadingDim() <<"\n";
-
 	if (_sparse_type == SparseMatrix::CSC){
 
-		//copyToHost(*(new Matrix()),true);
-		//target.copyToHost(*(new Matrix()),true);
-		//b.copyToHost(*(new Matrix()),true);
-		//cusparseSetPointerMode(cudaSetup::_cusparseHandle,CUSPARSE_POINTER_MODE_HOST);
-		//juto to check
-		/*
-		cout << "csc, rows " << getNumRows()<< ", cols: "<< getNumCols() << ", nzz: "<< _nzz<< " btrans: "<< b.isTrans() <<"\n";
-
-		check_matrix<<<1,1>>>(getDevData(), _sparseInd, _sparsePtr, _nzz, getNumCols(), getNumRows());
-
-		check_matrix_dense<<<1,1>>>(b.getDevData(), b.getNumRows(), b.getNumCols());
-		check_matrix_dense<<<1,1>>>(target.getDevData(), target.getNumRows(), target.getNumCols());
-        */
 		if (b.isTrans()){
-
-			//cout << "new implementation col by col";
-			/*
-			sparseMult(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE,
-							getNumCols(), b.getNumCols(), getNumRows(),_nzz,
-							&scaleAB, cudaSetup::_sparseDescr,
-							getDevData(), _sparsePtr, _sparseInd,
-							b.getDevData(),  b.getLeadingDim() ,
-							&scaleTarget,
-							target.getDevData(), getNumRows());
-			*/
-
-
-			cusparseStatus_t cusparseStatus = cusparseScsrmm(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE ,
-							getNumCols(), b.getNumCols(), getNumRows(),_nzz,
-							&scaleAB, cudaSetup::_sparseDescr,
-							getDevData(), _sparsePtr, _sparseInd,
-							b.getDevData(),  b.getLeadingDim() ,
-							&scaleTarget,
-							target.getDevData(), getNumRows());
-			checkCudaErrors(cusparseStatus);
-
+			target.scale(scaleTarget);
+			int numThread = _nzz / getNumCols();
+			//cout << "num thread: " << numThread << "\n";
+			numThread -= ((numThread) % 32);
+			//cout << "num thread: " << numThread << "\n";
+			numThread += 32;
+			//cout << "finally pippo num thread: " << numThread << "nzz: "<< _nzz << " numCOls: "<< getNumCols()<< "\n";
+			dim3 threads(numThread);
+			dim3 blocks(std::min(NUM_BLOCKS_MAX, getNumCols()));
+			//sparse_mul_trans<<<blocks,threads, b.getNumCols() * sizeof(float)>>>(scaleAB, getNumCols(), getNumRows(), b.getNumCols(), getDevData(), _sparseInd, _sparsePtr, b.getDevData(), target.getDevData());
+			sparse_mul_trans<<<blocks,threads>>>(scaleAB, getNumCols(), getNumRows(), b.getNumCols(), getDevData(), _sparseInd, _sparsePtr, b.getDevData(), target.getDevData());
 
 		}else{
-		cusparseStatus_t cusparseStatus = cusparseScsrmm2(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE ,b.isTrans()?CUSPARSE_OPERATION_NON_TRANSPOSE: CUSPARSE_OPERATION_TRANSPOSE,
-				getNumCols(), b.getNumCols(), getNumRows(),_nzz,
-				&scaleAB, cudaSetup::_sparseDescr,
-				getDevData(), _sparsePtr, _sparseInd,
-				b.getDevData(),  b.getLeadingDim() ,
-				&scaleTarget,
-				target.getDevData(), getNumRows());
-		checkCudaErrors(cusparseStatus);
+			cusparseStatus_t cusparseStatus = cusparseScsrmm2(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE ,b.isTrans()?CUSPARSE_OPERATION_NON_TRANSPOSE: CUSPARSE_OPERATION_TRANSPOSE,
+					getNumCols(), b.getNumCols(), getNumRows(),_nzz,
+					&scaleAB, cudaSetup::_sparseDescr,
+					getDevData(), _sparsePtr, _sparseInd,
+					b.getDevData(),  b.getLeadingDim() ,
+					&scaleTarget,
+					target.getDevData(), getNumRows());
+			checkCudaErrors(cusparseStatus);
 		}
-
 	}else{
-		//cout << "csr, rows " << getNumRows()<< ", cols: "<< getNumCols() << ", nzz: "<< _nzz<< " btrans: "<< b.isTrans() <<"\n";
-		//check_matrix<<<1,1>>>(getDevData(), _sparseInd, _sparsePtr, _nzz,  getNumRows(),getNumCols());
 		cusparseStatus_t cusparseStatus = cusparseScsrmm2(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_NON_TRANSPOSE ,b.isTrans()?CUSPARSE_OPERATION_NON_TRANSPOSE: CUSPARSE_OPERATION_TRANSPOSE,
 				getNumRows(), b.getNumCols(), getNumCols(),_nzz,
 				&scaleAB, cudaSetup::_sparseDescr,
@@ -302,15 +273,13 @@ void SparseNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, fl
 				target.getDevData(), getNumRows());
 		checkCudaErrors(cusparseStatus);
 	}
-
-	//cout << "done addproduct changes Sparse\n";
 }
 
 void SparseNVMatrix::copyToHost(Matrix& hostMatrix, bool resizeTarget) const {
-    if (resizeTarget) {
-        hostMatrix.resize(_numRows, _numCols);
-    }
-    copyToHost(hostMatrix);
+	if (resizeTarget) {
+		hostMatrix.resize(_numRows, _numCols);
+	}
+	copyToHost(hostMatrix);
 }
 
 

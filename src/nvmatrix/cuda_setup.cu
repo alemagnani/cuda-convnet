@@ -38,6 +38,7 @@ void CudaStart()
 void CudaStop()
 {
 	if (_cudaInitialized)
+		std::cout << "descroying the cusparse handle\n";
 		cusparseDestroy(_cusparseHandle);
 	_cudaInitialized = false;
 }

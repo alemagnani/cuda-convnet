@@ -23,11 +23,9 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy
-import sys
 import getopt as opt
 from util import *
 from math import sqrt, ceil, floor
-import os
 from gpumodel import IGPUModel
 import random as r
 import numpy.random as nr
@@ -246,7 +244,10 @@ class ShowConvNet(ConvNet):
         while True:
             batch = next_data[1]
             data = next_data[2]
-            ftrs = n.zeros((data[0].shape[1], num_ftrs), dtype=n.single)
+            print 'data[0] typr {}'.format(type(data[0]))
+            data_point =data[1].shape[1]
+            print 'data point {}'.format(data_point)
+            ftrs = n.zeros((data_point, num_ftrs), dtype=n.single)
             self.libmodel.startFeatureWriter(data + [ftrs], self.ftr_layer_idx)
             
             # load the next batch while the current one is computing
@@ -277,7 +278,7 @@ class ShowConvNet(ConvNet):
     def get_options_parser(cls):
         op = ConvNet.get_options_parser()
         for option in list(op.options):
-            if option not in ('gpu', 'load_file', 'train_batch_range', 'test_batch_range'):
+            if option not in ( 'gpu', 'load_file', 'train_batch_range', 'test_batch_range'):
                 op.delete_option(option)
         op.add_option("show-cost", "show_cost", StringOptionParser, "Show specified objective function", default="")
         op.add_option("show-filters", "show_filters", StringOptionParser, "Show learned filters in specified layer", default="")
@@ -298,6 +299,7 @@ if __name__ == "__main__":
     try:
         op = ShowConvNet.get_options_parser()
         op, load_dic = IGPUModel.parse_options(op)
+        print op, load_dic
         model = ShowConvNet(op, load_dic)
         model.start()
     except (UnpickleError, ShowNetError, opt.GetoptError), e:

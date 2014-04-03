@@ -24,7 +24,8 @@
 
 import numpy as n
 import numpy.random as nr
-import scikit_learn_wrapper
+from scikit_data_provider import ScikitDataProvider
+
 from util import *
 from data import *
 from options import *
@@ -53,8 +54,10 @@ class ConvNet(IGPUModel):
         self.libmodel.initModel(self.layers, self.minibatch_size, self.device_ids[0])
         
     def init_model_state(self):
+        print "init model state"
         ms = self.model_state
         if self.load_file:
+            print "init from file"
             ms['layers'] = lay.LayerParser.parse_layers(self.layer_def, self.layer_params, self, ms['layers'])
         else:
             ms['layers'] = lay.LayerParser.parse_layers(self.layer_def, self.layer_params, self)
@@ -199,7 +202,7 @@ class ConvNet(IGPUModel):
         DataProvider.register_data_provider('cifar', 'CIFAR', CIFARDataProvider)
         DataProvider.register_data_provider('dummy-cn-n', 'Dummy ConvNet', DummyConvNetDataProvider)
         DataProvider.register_data_provider('cifar-cropped', 'Cropped CIFAR', CroppedCIFARDataProvider)
-        DataProvider.register_data_provider('dp_scikit', 'train-test split scikit learn', scikit_learn_wrapper.ScikitDataProvider)
+        DataProvider.register_data_provider('dp_scikit', 'train-test split scikit learn', ScikitDataProvider)
         
         return op
     

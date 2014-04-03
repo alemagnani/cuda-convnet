@@ -127,7 +127,6 @@ NVMatrix::NVMatrix(float* devData, int numRows, int numCols, int stride, bool is
 
 NVMatrix::~NVMatrix() {
     if(_ownsData && _numElements > 0) {
-    	//cout << "freeing matrices for dense matrix" << get_type() <<"\n\n";
         cublasStatus status = cublasFree(_devData);
         if (status != CUBLAS_STATUS_SUCCESS) {
         	{
@@ -178,7 +177,6 @@ void NVMatrix::copyToHost(Matrix& hostMatrix) const {
     assert(isSameDims(hostMatrix));
     hostMatrix.setTrans(_isTrans);
     if (getNumElements() > 0) {
-    //    printf("rows: %d, cols: %d, stride: %d\n", getNumRows(), getNumCols(), getStride());
         cublasStatus status = cublasGetMatrix(getLeadingDim(),getFollowingDim(), sizeof(float),
                                              _devData, getStride(), hostMatrix.getData(), hostMatrix.getLeadingDim());
         if (status != CUBLAS_STATUS_SUCCESS) {
@@ -212,7 +210,6 @@ void NVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) con
 
 
     assert(isContiguous() && b.isContiguous() && target.isContiguous());
-//    assert(&target != &b);
     assert(_numCols == b.getNumRows());
     if(&target != this) {
         target.resize(_numRows, b.getNumCols());
@@ -227,7 +224,6 @@ void NVMatrix::rightMult(const NVMatrix &b, float scaleAB, NVMatrix &target) con
                 scaleAB, _devData, getLeadingDim(), b.getDevData(), b.getLeadingDim(),
                 0, target.getDevData(), getNumRows());
     checkCublasError("cublasSgemm failed");
-//    cudaThreadSynchronize();
 }
 
 void NVMatrix::rightMult(const NVMatrix &b, float scaleAB) {
@@ -244,18 +240,12 @@ void NVMatrix::rightMult(const NVMatrix &b, NVMatrix& target) const {
  */
 void NVMatrix::addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis, float scaleAB) {
 
-	//cout << "a type: " << a.get_type() << ", b type: " << b.get_type() << "\n\n";
-	//cout << "a size " << a.getNumRows() << " , " << a.getNumCols() << "\n";
-	//cout << "b size " << b.getNumRows() << " , " << b.getNumCols() << "\n";
-
     if (scaleThis == 0) {
-    	//printf("right mul with scale 0-------------------------\n");
         a.rightMult(b, scaleAB, *this);
         return;
     }
     string t = string("addProduct ");
     RANGE( t.c_str())
-    //printf("scale is not 0 %f\n", scaleThis);
 
     assert(isContiguous());
     assert(a.getNumCols() == b.getNumRows());
@@ -274,8 +264,6 @@ void NVMatrix::addProduct(const NVMatrix& a, const NVMatrix &b, float scaleThis,
     }else if (a.get_type() == Matrix::SPARSE ) {
     	a.addProductChanged(b,scaleThis, scaleAB, *this);
     }
-
-//    cudaThreadSynchronize();
 }
 
 void NVMatrix::addProductChanged( const NVMatrix &b, float scaleThis, float scaleAB, NVMatrix &target) const{

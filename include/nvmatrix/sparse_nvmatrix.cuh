@@ -30,6 +30,8 @@ protected:
 	bool _ownsDataInd;
 	bool _ownsDataPtr;
 
+	const SparseMatrix * _hostmatrix;
+
 	SparseMatrix::SPARSE_TYPE _sparse_type;
 
 public:

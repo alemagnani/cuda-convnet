@@ -84,8 +84,8 @@ public:
     }
 
     void cancel(){
-    	pthread_cancel(_threadID);
     	this->stop();
+    	pthread_cancel(_threadID);
     }
 
     void join() {

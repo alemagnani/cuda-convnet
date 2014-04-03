@@ -4,6 +4,7 @@ MODELNAME := _ConvNet
 
 INCLUDES :=  -I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH) -I./include -I./include/common -I./include/cudaconv2 -I./include/nvmatrix
 LIB := -L/usr/lib/nvidia-current/ -lpthread -L$(ATLAS_LIB_PATH) -L$(CUDA_INSTALL_PATH)/lib64 -lcblas  -lnvToolsExt
+#LIB := -L/usr/lib/nvidia-current/ -lpthread -L$(ATLAS_LIB_PATH) -L$(CUDA_INSTALL_PATH)/lib64 -lcblas 
 
 USECUBLAS   := 1
 USECUSPARSE := 1
@@ -13,8 +14,8 @@ LIB += -lpython$(PYTHON_VERSION)
 
 GENCODE_ARCH :=  -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 
-#COMMONFLAGS := -DUSE_NVTX -DNUMPY_INTERFACE -DMODELNAME=$(MODELNAME) -DINITNAME=init$(MODELNAME)
-COMMONFLAGS :=  -DNUMPY_INTERFACE -DMODELNAME=$(MODELNAME) -DINITNAME=init$(MODELNAME)
+COMMONFLAGS := -DUSE_NVTX -DNUMPY_INTERFACE -DMODELNAME=$(MODELNAME) -DINITNAME=init$(MODELNAME)
+#COMMONFLAGS :=  -DNUMPY_INTERFACE -DMODELNAME=$(MODELNAME) -DINITNAME=init$(MODELNAME)
 
 EXECUTABLE	:= $(MODELNAME).so
 

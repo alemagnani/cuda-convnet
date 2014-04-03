@@ -58,9 +58,11 @@ using namespace std;
 class Tracer {
 public:
 	Tracer(const char* name) {
+       cudaThreadSynchronize();
 		nvtxRangePushA(name);
 	}
 	~Tracer() {
+        cudaThreadSynchronize();
 		nvtxRangePop();
 	}
 };

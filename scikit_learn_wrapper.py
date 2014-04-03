@@ -1,4 +1,6 @@
+import os
 import random
+from os.path import join
 from sklearn import datasets
 import scipy
 from scipy.sparse import csc_matrix, csr_matrix
@@ -13,72 +15,15 @@ from data import DataProvider, DataProviderException
 from sklearn.cross_validation import train_test_split
 from optparse import OptionParser
 import numpy as np
+from entropy_maximization.entropy_maximization_sgd import SGDEntropyMaximizationFast
+from gpumodel import IGPUModel
+import scikit_data_provider
+import shownet
 
 
-class ScikitDataProvider(DataProvider):
-    def __init__(self, data, batch_range=None, init_epoch=1, init_batchnum=None, dp_params={}, test=False):
-        if batch_range == None:
-            raise Exception('the range is empty')
-        if init_batchnum is None or init_batchnum not in batch_range:
-            init_batchnum = batch_range[0]
-
-        self.data_dir = None
-        self.batch_range = batch_range
-        self.curr_epoch = init_epoch
-        self.curr_batchnum = init_batchnum
-        self.dp_params = dp_params
-        self.batch_meta = None
-        self.data_dic = None
-        self.test = test
-        self.batch_idx = batch_range.index(init_batchnum)
-
-        print 'data is: {}'.format(len(data))
-        self.X = data[0]
-        self.y = data[1]
-
-        self.fraction_test = 0.2
-
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y,
-                                                                                test_size=self.fraction_test,
-                                                                                random_state=42)
 
 
-    def get_batch(self, batch_num):
-        if batch_num == 1:
 
-            out = [_expand(self.X_train), _adjust_labels(self.y_train)]
-        else:
-            out = [_expand(self.X_test), _adjust_labels(self.y_test)]
-            #print 'bartch shape x: {} , y: {}'.format(out[0].shape, out[1].shape)
-        return out
-
-    def get_data_dims(self, idx):
-        return self.X.shape[1] if idx == 0 else 1
-
-
-    def get_num_classes(self):
-        return max(self.y) + 1
-
-
-def _adjust_labels(labels):
-    n = labels.shape[0]
-    out = np.require(labels.reshape((1, n)), dtype=np.float32, requirements='C')
-    print 'shape of labels is {}'.format(out.shape)
-    return out
-
-
-def _expand(matrix):
-    if isinstance(matrix, csr_matrix):
-        check_correct_indeces(matrix)
-        rows, cols = matrix.shape
-        print "matrix output has size {}, {}".format(cols,rows)
-
-        return [np.require(matrix.data, dtype=np.float32, requirements='C'),np.require( matrix.indices, dtype=np.int32, requirements='C'), np.require(matrix.indptr, dtype=np.int32, requirements='C'), cols, rows]
-    else:
-        print 'working with a dense matrix'
-        out =  np.require(matrix.T, dtype=np.float32, requirements='C')
-        print 'the shape is {}'.format(out.shape)
-        return out
 
 
 class ConvNetLearn(BaseEstimator):
@@ -124,10 +69,57 @@ class ConvNetLearn(BaseEstimator):
                     sys.exit()
 
         model = MyConvNet(op, load_dic=None)
+        self.last_model = join(self.output_folder,model.save_file)
+        print 'last model name {}'.format(self.last_model)
         model.start()
 
     def predict(self, X):
-        pass
+        op = shownet.ShowConvNet.get_options_parser()
+
+        predict_dict =  {
+            '--write-features': 'probs',
+            '--feature-path' : '/tmp/feature_path',
+            '--test-range': '2',
+            '--train-range': '1',
+            '-f': self.last_model,
+            '--data-provider': 'dp_scikit',
+            '--show-preds' : '',
+            '--multiview-test': 0,
+            '--logreg-name': 'aaa'
+            }
+
+        op.parse_from_dictionary(predict_dict)
+        load_dic = None
+        options = op.options
+        if options["load_file"].value_given:
+            print 'load file option provided'
+            load_dic = IGPUModel.load_checkpoint(options["load_file"].value)
+            old_op = load_dic["op"]
+            old_op.merge_from(op)
+            op = old_op
+        op.eval_expr_defaults()
+
+
+        class MyConvNet(shownet.ShowConvNet):
+            def init_data_providers(self):
+                self.dp_params['convnet'] = self
+
+            def compute_probs(self, X):
+                if not os.path.exists(self.feature_path):
+                    os.makedirs(self.feature_path)
+                data_point =X.shape[0]
+                data = [scikit_data_provider.expand(X),scikit_data_provider.adjust_labels( np.array([0] * data_point,dtype=np.float32))]
+                num_ftrs = self.layers[self.ftr_layer_idx]['outputs']
+
+                ftrs = np.zeros((data_point, num_ftrs), dtype=np.single)
+                self.libmodel.startFeatureWriter(data + [ftrs], self.ftr_layer_idx)
+
+                self.finish_batch()
+                return ftrs
+
+
+        model = MyConvNet(op, load_dic=load_dic)
+        return model.compute_probs(X)
 
 
 def main():
@@ -172,14 +164,17 @@ def main():
         # define a pipeline combining a text feature extractor with a simple
         # classifier
         pipeline = Pipeline([
-            ('vect', CountVectorizer(max_features=300000)),
+            ('vect', CountVectorizer(max_features=1024*40,dtype=np.float32)),
             ('tfidf', TfidfTransformer())
         ])
 
-        X = pipeline.fit_transform(data.data, data.target)
+        X = pipeline.fit_transform(data.data)
+        X = X.astype(np.float32)
         y = data.target
         permutation = range(X.shape[0])
+        random.seed(1)
         random.shuffle(permutation)
+        print permutation[0:10]
 
         #permutation = permutation[0:15]
 
@@ -199,48 +194,19 @@ def main():
 
         print 'type if x is {}'.format(type(X))
 
-    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=5)
+    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=100)
+    #net = SGDEntropyMaximizationFast(verbose=True, alpha= 0.001, early_stop=False, n_iter=10, min_epoch=10, learning_rate='fix')
+
     #print 'fitting'
     #net =  SGDClassifier(loss="hinge", penalty="l2",  n_iter=50, verbose=10)
     #print 'done fitting'
 
     net.fit(X, y)
 
-def check_correct_indeces(X):
-
-    ind = X.indices
-    ptr = X.indptr
-    data = X.data
-
-    for k in xrange(len(ptr)-1):
-        s = set()
-        begin = ptr[k]
-        end = ptr[k+1]
-
-        idx   = np.argsort(ind[begin:end])
-        ind[begin:end] = ind[begin:end][idx]
-        data[begin:end] = data[begin:end][idx]
+    probs = net.predict(X)
+    print probs
 
 
-        #print 'k: {}, begin: {}, end: {}'.format(k, begin,end)
-        if end < begin:
-            print 'beging in wrong order with end ptr: {}'.format(ptr)
-            exit(-1)
-
-        previous_ni = -1
-        for j in range(begin,end):
-            ni = ind[j]
-            if ni < previous_ni:
-                print 'indeces ont in order ni: {}, previous: {}, j: {}'.format(ni, previous_ni, j)
-                print ind[begin:end]
-                exit(-1)
-            else:
-                previous_ni = ni
-            if ni in s:
-                print 'problem with repeating indeces'
-                exit(-1)
-            else:
-                s.add(ni)
 
 
 if __name__ == "__main__":

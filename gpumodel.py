@@ -75,8 +75,11 @@ class IGPUModel:
             self.model_state["batchnum"] = self.train_batch_range[0]
 
         self.init_data_providers()
-        if load_dic: 
-            self.train_data_provider.advance_batch()
+        if load_dic:
+            try:
+                self.train_data_provider.advance_batch()
+            except:
+                pass
             
         # model state often requries knowledge of data provider, so it's initialized after
         try:
@@ -121,7 +124,8 @@ class IGPUModel:
         if self.test_only:
             self.test_outputs += [self.get_test_error()]
             self.print_test_results()
-            sys.exit(0)
+            #sys.exit(0)
+            return
         self.train()
     
     def train(self):
@@ -163,7 +167,7 @@ class IGPUModel:
     
     def cleanup(self):
         self.libmodel.stopModel();
-        sys.exit(0)
+        #sys.exit(0)
         
     def sync_with_host(self):
         self.libmodel.syncWithHost()

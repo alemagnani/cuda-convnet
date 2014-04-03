@@ -18,6 +18,8 @@ __global__ void check_matrix(float * data, int* ind, int* ptr, int nzz, int size
 
 __global__ void check_matrix_dense(float * data, int row, int col);
 
+__global__  void sparse_mul_trans(float alpha, int m, int n, int k,const float * data,const int* ind,const int* ptr,const float* B, float* C);
+
 void sparseMult(cusparseHandle_t handle,
         cusparseOperation_t transa,
         int m,

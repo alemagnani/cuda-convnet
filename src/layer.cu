@@ -102,7 +102,6 @@ void Layer::fprop(NVMatrix& v, PASS_TYPE passType) {
 void Layer::fprop(NVMatrixV& v, PASS_TYPE passType) {
 	string t = string("fprop core ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
-	//cout << " fprop\n";
     assert(v.size() == _prev.size());
     _inputs.clear();
     _inputs.insert(_inputs.begin(), v.begin(), v.end());
@@ -150,7 +149,6 @@ void Layer::bprop(PASS_TYPE passType) {
 }
 
 void Layer::bprop(NVMatrix& v, PASS_TYPE passType) {
-	//cout << "bprop\n";
     v.transpose(_trans);
     for (int i = 0; i < _prev.size(); i++) {
         _prev[i]->getActs().transpose(_trans);
@@ -273,7 +271,6 @@ NVMatrix& Layer::getActsGrad() {
  */
 NeuronLayer::NeuronLayer(ConvNet* convNet, PyObject* paramsDict) 
     : Layer(convNet, paramsDict, true) {
-	//printf("creating neural network layer!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     _neuron = &Neuron::makeNeuron(PyDict_GetItemString(paramsDict, "neuron"));
 }
 
@@ -392,42 +389,25 @@ FCLayer::FCLayer(ConvNet* convNet, PyObject* paramsDict) : WeightLayer(convNet, 
 }
 
 void FCLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
+
 	string t = string("fpropActs ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
 
 	NVMatrix& inp = *_inputs[inpIdx];
-
-	  //cout << "\nprinting input fc\n";
-	  //inp.print(3,3);
-
-	/*
-	if (inp.hasNan()){
-			printf("\nthe matrix with size %d %d has nan, sum %f \n", inp.getNumRows(), inp.getNumCols(),inp.sum());
-	}else{
-		printf("\nthe matrix with size %d %d has NO nan, sum %f \n", inp.getNumRows(), inp.getNumCols(),inp.sum());
-	}
-	*/
-	//inp.print(0,inp.getNumRows(),0, inp.getNumCols());
-	//cout << "doing fpropActs FC layer\n";
     getActs().addProduct(*_inputs[inpIdx], *_weights[inpIdx], scaleTargets, 1);
-
-    //cout << "\nprinting output after mult";
-    //getActs().print(3,3);
 
     if (scaleTargets == 0) {
         getActs().addVector(_biases->getW());
     }
+
 }
 
 void FCLayer::bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, PASS_TYPE passType) {
 	string t = string("bpropActs ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
-	//cout << "bpropActs FC\n";
     NVMatrix& weights_T = _weights[inpIdx].getW().getTranspose();
     _prev[inpIdx]->getActsGrad().addProduct(v, weights_T, scaleTargets, 1);
-    //cout << "deleting weight_T in bpropActs FC\n";
     delete &weights_T;
-    //cout << "done deleting\n";
 }
 
 void FCLayer::bpropBiases(NVMatrix& v, PASS_TYPE passType) {
@@ -437,27 +417,19 @@ void FCLayer::bpropBiases(NVMatrix& v, PASS_TYPE passType) {
 }
 
 void FCLayer::bpropWeights(NVMatrix& v, int inpIdx, PASS_TYPE passType) {
-	//cout << "	bpropWeights FC\n";
+
 	string t = string("bpropWeights ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
     int numCases = v.getNumRows();
 
     NVMatrix& prevActs_T = _prev[inpIdx]->getActs().getTranspose();
-    //cout << "\nprevAct back prop print\n";
-    //prevActs_T.print(3,3);
 
     float scaleInc = (_weights[inpIdx].getNumUpdates() == 0 && passType != PASS_GC) * _weights[inpIdx].getMom();
     float scaleGrad = passType == PASS_GC ? 1 : _weights[inpIdx].getEps() / numCases;
     
-    //cout << "\ninc before\n";
-    //_weights[inpIdx].getInc().print(3,3);
     _weights[inpIdx].getInc().addProduct(prevActs_T, v, scaleInc, scaleGrad);
-    //cout << "\ninc after\n";
-    //_weights[inpIdx].getInc().print(3,3);
 
-    //cout << "deletinig in fc prevact\n";
     delete &prevActs_T;
-    //cout << "done deleting\n";
 }
 
 /* 
@@ -659,31 +631,49 @@ void LocalUnsharedLayer::bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, 
 SoftmaxLayer::SoftmaxLayer(ConvNet* convNet, PyObject* paramsDict) : Layer(convNet, paramsDict, true) {
 }
 
+//this needs to be done in one kernel only
+/*
 void SoftmaxLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
 	string t = string("fpropActs ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
     NVMatrix& input = *_inputs[0];
-	//cout << "input type to softmax " << input.get_type() << "\n";
-	//input.print(3,3);
 
-	//cout << "input in softmax is of type " << input.get_type() << " rows "<< input.getNumRows() << "cols " << input.getNumCols() << "\n";
-    //printf("printing input");
-    //input.print(0,input.getNumRows(), 0, input.getNumCols());
     NVMatrix& max = input.max(1);
-    //cout << "softmax getActs type: " << getActs().get_type() << " rows: " << getActs().getNumRows() << "cols: " << getActs().getNumCols() << "\n";
     input.addVector(max, -1, getActs());
 
     getActs().apply(NVMatrixOps::Exp());
     NVMatrix& sum = getActs().sum(1);
 
     getActs().eltwiseDivideByVector(sum);
-    //cout << "output softmax\n";
-    //getActs().print(3,3);
-    //cout << "delete max\n";
     delete &max;
-    //cout << "delete sum\n";
     delete &sum;
 }
+*/
+
+void SoftmaxLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType) {
+	string t = string("fpropActs ") +_type+ string( " , ")+ _name;
+		RANGE( t.c_str())
+	NVMatrix& input = *_inputs[0];
+
+		 NVMatrix& max = input.max(1);
+		    input.addVector(max, -1, getActs());
+
+		 //cout << "input: " << input.getNumRows() << ", " << input.getNumCols() << ",  "<< input.isTrans() << ", output: "   << getActs().getNumRows() << ", " << getActs().getNumCols() << ",  "<< getActs().isTrans() << " max:" << max.getNumRows() << ", " << max.getNumCols() << "\n\n";
+
+		    getActs().apply(NVMatrixOps::Exp());
+		    NVMatrix& sum = getActs().sum(1);
+
+		    getActs().eltwiseDivideByVector(sum);
+		    delete &max;
+		    delete &sum;
+
+
+
+	//computeSoftMax(input, getActs());
+}
+
+
+
 
 void SoftmaxLayer::bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, PASS_TYPE passType) {
 	string t = string("bpropActs ") +_type+ string( " , ")+ _name;
@@ -1063,8 +1053,6 @@ void LogregCostLayer::fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passTy
         NVMatrix& trueLabelLogProbs = getActs(), correctProbs;
         computeLogregCost(labels, probs, trueLabelLogProbs, correctProbs);
         _costv.clear();
-        //cout << "logprobsum: " << trueLabelLogProbs.sum() << "\n";
-		//cout << "correctprobs: " << correctProbs.sum() << "\n";
         _costv.push_back(-trueLabelLogProbs.sum());
         _costv.push_back(numCases - correctProbs.sum());
     }

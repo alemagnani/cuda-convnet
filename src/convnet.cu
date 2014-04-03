@@ -150,8 +150,9 @@ void ConvNet::initCuda() {
     if (randomSeedEnv != NULL) {
       randomSeed = atoi(randomSeedEnv);
     }
-
-    NVMatrix::initRandom(randomSeed);
+    if (! NVMatrix::isRndInitialized()){
+    	NVMatrix::initRandom(randomSeed);
+    }
 
     copyToGPU();
 }
@@ -168,8 +169,10 @@ void* ConvNet::run() {
 }
 
 void ConvNet::stopCuda() {
+	cudaThreadSynchronize();
 	cout << "stopping cuda!!!\n";
 	cudaSetup::CudaStop();
+	//we should kill the random state
 	cudaDeviceReset();
 }
 

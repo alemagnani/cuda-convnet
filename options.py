@@ -123,6 +123,7 @@ class OptionsParser:
         self.options[name].set_value(value, parse=parse)
     
     def get_value(self, name):
+        #print 'options {}'.format(self.options)
         return self.options[name].value
         
     def delete_option(self, name):

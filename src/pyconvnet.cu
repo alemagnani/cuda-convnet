@@ -90,9 +90,10 @@ PyObject* initModel(PyObject *self, PyObject *args) {
 
 PyObject* stopModel(PyObject *self, PyObject *args){
 	model->cancel();
+	//delete model;
+	model = NULL;
 	return Py_BuildValue("i", 0);
 }
-
 
 
 /*

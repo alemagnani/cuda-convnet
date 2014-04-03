@@ -163,6 +163,18 @@ __global__ void kEltwiseMaxGrad(float* actGrad, float* input, float* output, flo
     }
 }
 
+__global__ void softMax(float* input, int numRows, int numCols, float* output){
+	extern __shared__ volatile float input_row_cache[];
+	for(int row = blockIdx.x; row < numRows; row += gridDim.x){
+			//read b times alphs into cache
+			for (int col = threadIdx.x; col < numCols; col += blockDim.x){
+
+
+			}
+	}
+
+}
+
 void computeEltwiseMaxGrad(NVMatrix& actGrad, NVMatrix& input, NVMatrix& output, NVMatrix& target, bool add) {
     assert(actGrad.isContiguous());
     assert(output.isContiguous());
@@ -287,4 +299,23 @@ void computeLogregSoftmaxGrad(NVMatrix& labels, NVMatrix& probs, NVMatrix& targe
     }
 
     getLastCudaError("computeLogregSoftmaxGrad: Kernel execution failed");
+}
+
+void computeSoftMax(NVMatrix& input, NVMatrix& output){
+	if (!input.isTrans() || !output.isTrans()){
+		throw new string("the soft max support only trans matrices");
+	}
+/*
+  NVMatrix& max = input.max(1);
+    input.addVector(max, -1, getActs());
+
+    getActs().apply(NVMatrixOps::Exp());
+    NVMatrix& sum = getActs().sum(1);
+
+    getActs().eltwiseDivideByVector(sum);
+ */
+	dim3 threads(LOGREG_GRAD_THREADS_X, LOGREG_GRAD_THREADS_Y);
+	dim3 blocks(DIVUP(input.getNumRows(), LOGREG_GRAD_THREADS_X), DIVUP(input.getNumCols(), LOGREG_GRAD_THREADS_Y));
+	softMax<<<blocks, threads>>>(input.getDevData(), input.getNumRows(), input.getNumCols(), output.getDevData());
+
 }
