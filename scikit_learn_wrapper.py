@@ -1,10 +1,14 @@
+import json
 import os
 import random
 from os.path import join
+import io
+import shutil
+from time import asctime, localtime, time
 from sklearn import datasets
 import scipy
 from scipy.sparse import csc_matrix, csr_matrix
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, ClassifierMixin
 import sys
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
@@ -15,33 +19,101 @@ from data import DataProvider, DataProviderException
 from sklearn.cross_validation import train_test_split
 from optparse import OptionParser
 import numpy as np
-from entropy_maximization.entropy_maximization_sgd import SGDEntropyMaximizationFast
+#from entropy_maximization.entropy_maximization_sgd import SGDEntropyMaximizationFast
 from gpumodel import IGPUModel
+from layer import MyConfigParser
+from ordereddict import OrderedDict
 import scikit_data_provider
 import shownet
 
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 
 
 
-
-class ConvNetLearn(BaseEstimator):
-    def __init__(self, layer_file, layer_params_file, output_folder="/tmp/convnet", epochs=400):
+class ConvNetLearn(BaseEstimator, ClassifierMixin):
+    def __init__(self, layer_file, layer_params_file, output_folder="/tmp/convnet", epochs=400, fraction_test=0.01, mcp_layers=None, mcp_params=None, last_model=None):
         print 'initializing the ConvNetLearn'
         self.layer_file = layer_file
         self.layer_params_file = layer_params_file
+        self.last_model = last_model
+        self.fraction_test = fraction_test
+
+        if mcp_layers is None:
+            self.mcp_layers = MyConfigParser(dict_type=OrderedDict)
+            self.mcp_layers.read([layer_file])
+
+        else:
+            self.mcp_layers = mcp_layers
+
+        if mcp_params is None:
+            self.mcp_params = MyConfigParser(dict_type=OrderedDict)
+            self.mcp_params.read([layer_params_file])
+        else:
+            self.mcp_params = mcp_params
+
         self.output_folder = output_folder
+        self.epochs = epochs
         self.dict = {
-            '--layer-def': layer_file,
+            '--layer-def': '',
             '--test-range': '2',
             '--data-path': None,
             '--train-range': '1',
             '--save-path': output_folder,
-            '--layer-params': layer_params_file,
+            '--layer-params': '',
             '--test-freq': '13',
             '--data-provider': 'dp_scikit',
             '--epochs': epochs}
+
+
+    def new(self):
+        return ConvNetLearn(layer_file=self.layer_file,layer_params_file=self.layer_params_file,output_folder=self.output_folder, epochs=self.epochs, mcp_layers=self.mcp_layers, mcp_params=self.mcp_params, fraction_test=self.fraction_test)
+
+
+    def dump(self, folder):
+        try:
+            os.mkdir(folder)
+        except:
+            pass
+        new_layer_file = join(folder, 'layer.cfg')
+        new_layer_param_file = join(folder, 'layer_params.cfg')
+        new_last_model = join(folder,'last_model')
+        out = {
+            'type': 'ConvNetLearn',
+            'output_folder': self.output_folder,
+            'epochs': self.epochs,
+            'layer_file': new_layer_file,
+            'layer_params_file': new_layer_param_file,
+            'last_model': new_last_model,
+            'fraction_test' : self.fraction_test
+        }
+        with io.open(join(folder, 'model.json'), 'wb') as model_file:
+            json.dump(out, model_file)
+        try:
+            shutil.copyfile(self.layer_file, new_layer_file)
+            shutil.copyfile(self.layer_params_file, new_layer_param_file)
+            if self.last_model is not None:
+                shutil.rmtree(new_last_model,ignore_errors=True)
+                shutil.copyfile(self.last_model, new_last_model)
+
+        except:
+            logger.info( 'cannot copu stuff into  %s' % folder)
+
+    @staticmethod
+    def load(folder, tree_node_data=None):
+        model_file_name = join(folder, 'model.json')
+        with open(model_file_name, 'rb') as model_file:
+            model = json.load(model_file)
+        type = model.get('type')
+        if type != 'ConvNetLearn':
+            raise Exception('wrong type %s') % type
+        out = ConvNetLearn(layer_file=model.get('layer_file'),layer_params_file=model.get('layer_params_file'),output_folder=model.get('output_folder'), epochs=model.get('epochs'), last_model=model.get('last_model'), fraction_test=model.get('fraction_test'))
+        return out
+
 
 
     def fit(self, X, y, **kwargs):
@@ -51,29 +123,64 @@ class ConvNetLearn(BaseEstimator):
         op.parse_from_dictionary(self.dict)
         op.eval_expr_defaults()
 
+        num_classes = y.max()+1
+        logger.info('num classes {}'.format(num_classes))
+
+
+        #we adjust the number of classes dynamically
+        for name in self.mcp_layers.sections():
+            if self.mcp_layers.has_option(name,'outputs'):
+                if self.mcp_layers.get(name, 'outputs') == 'num_classes':
+                    self.mcp_layers.set( name, 'outputs', value='{}'.format(num_classes))
+        ##################
+
+
+
+
+        print 'X shape {}, y shape {}'.format( X.shape,y.shape)
+        X_train, X_test, y_train, y_test = train_test_split(X, y,test_size=self.fraction_test,random_state=42)
+
+
+        out_train = [scikit_data_provider.expand(X_train), scikit_data_provider.adjust_labels(y_train)]
+        out_test = [scikit_data_provider.expand(X_test), scikit_data_provider.adjust_labels(y_test)]
+
+
         class MyConvNet(convnet.ConvNet):
+
+            def __init__(self, op, load_dic, mcp_layers, mcp_params, fraction_test):
+                  self.layer_def_dict = mcp_layers
+                  self.fraction_test = fraction_test
+                  self.epoch_count = 0
+
+                  self.layer_params_dict = mcp_params
+                  convnet.ConvNet.__init__(self,op,load_dic=load_dic,initialize_from_file=False)
+
+            def get_data_dims(self, idx):
+                return X.shape[1] if idx == 0 else 1
+
+            def get_num_classes(self):
+                return num_classes
+
+            def get_next_batch(self, train=True):
+                if train:
+                    self.epoch_count += 1
+                    return [self.epoch_count, 1 ,out_train]
+                else:
+                    return [self.epoch_count, 1, out_test]
+
+
+
             def init_data_providers(self):
                 self.dp_params['convnet'] = self
-                try:
-                    self.test_data_provider = DataProvider.get_instance([X, y], self.test_batch_range,
-                                                                        type=self.dp_type, dp_params=self.dp_params,
-                                                                        test=True)
-                    self.train_data_provider = DataProvider.get_instance([X, y], self.train_batch_range,
-                                                                         self.model_state["epoch"],
-                                                                         self.model_state["batchnum"],
-                                                                         type=self.dp_type, dp_params=self.dp_params,
-                                                                         test=False)
-                except DataProviderException, e:
-                    print "Unable to create data provider: %s" % e
-                    self.print_data_providers()
-                    sys.exit()
+                self.epoch_count = 0
 
-        model = MyConvNet(op, load_dic=None)
-        self.last_model = join(self.output_folder,model.save_file)
+        model = MyConvNet(op, load_dic=None, mcp_layers=self.mcp_layers, mcp_params=self.mcp_params, fraction_test=self.fraction_test)
+
+        self.last_model = join(self.output_folder, model.save_file)
         print 'last model name {}'.format(self.last_model)
         model.start()
 
-    def predict(self, X):
+    def predict_proba(self, X):
         op = shownet.ShowConvNet.get_options_parser()
 
         predict_dict =  {
@@ -105,21 +212,31 @@ class ConvNetLearn(BaseEstimator):
                 self.dp_params['convnet'] = self
 
             def compute_probs(self, X):
-                if not os.path.exists(self.feature_path):
-                    os.makedirs(self.feature_path)
                 data_point =X.shape[0]
-                data = [scikit_data_provider.expand(X),scikit_data_provider.adjust_labels( np.array([0] * data_point,dtype=np.float32))]
+                data = [scikit_data_provider.expand(X), scikit_data_provider.adjust_labels( np.array([0] * data_point,dtype=np.float32))]
                 num_ftrs = self.layers[self.ftr_layer_idx]['outputs']
 
                 ftrs = np.zeros((data_point, num_ftrs), dtype=np.single)
                 self.libmodel.startFeatureWriter(data + [ftrs], self.ftr_layer_idx)
 
                 self.finish_batch()
+
                 return ftrs
 
 
         model = MyConvNet(op, load_dic=load_dic)
-        return model.compute_probs(X)
+        probs =  model.compute_probs(X)
+        model.cleanup()
+        return probs
+    def predict(self,X):
+        probs = self.predict_proba(X)
+        return np.argmax(probs, axis=1)
+
+    def predict_best_proba(self, X, **kwargs):
+        probs = self.predict_proba(X)
+        return np.max(probs, axis=1)
+
+
 
 
 def main():
@@ -203,9 +320,8 @@ def main():
 
     net.fit(X, y)
 
-    probs = net.predict(X)
-    print probs
-
+    score = net.score(X, y)
+    print 'score is {}'.format(score)
 
 
 

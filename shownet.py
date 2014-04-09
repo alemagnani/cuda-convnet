@@ -244,9 +244,9 @@ class ShowConvNet(ConvNet):
         while True:
             batch = next_data[1]
             data = next_data[2]
-            print 'data[0] typr {}'.format(type(data[0]))
+            #print 'data[0] typr {}'.format(type(data[0]))
             data_point =data[1].shape[1]
-            print 'data point {}'.format(data_point)
+            #print 'data point {}'.format(data_point)
             ftrs = n.zeros((data_point, num_ftrs), dtype=n.single)
             self.libmodel.startFeatureWriter(data + [ftrs], self.ftr_layer_idx)
             

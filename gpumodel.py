@@ -56,7 +56,7 @@ class IGPUModel:
         #assert self.op.all_values_given()
         
         for o in op.get_options_list():
-            print 'name: {}, value: {}'.format(o.name,o.value)
+            #print 'name: {}, value: {}'.format(o.name,o.value)
             setattr(self, o.name, o.value)
 
         # these are things that the model must remember but they're not input parameters
@@ -88,6 +88,7 @@ class IGPUModel:
             print e
             sys.exit(1)
         for var, val in self.model_state.iteritems():
+            #print 'model state var: {}, val: {}'.format(var,val)
             setattr(self, var, val)
             
         self.import_model()
@@ -273,6 +274,7 @@ class IGPUModel:
         
         for f in sorted(os.listdir(checkpoint_dir), key=alphanum_key):
             if sum(os.path.getsize(os.path.join(checkpoint_dir, f2)) for f2 in os.listdir(checkpoint_dir)) > self.max_filesize_mb*1024*1024 and f != checkpoint_file:
+                print 'removing checkpoint: {}'.format(f)
                 os.remove(os.path.join(checkpoint_dir, f))
             else:
                 break

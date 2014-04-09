@@ -5,7 +5,7 @@ import numpy as np
 
 
 class ScikitDataProvider(DataProvider):
-    def __init__(self, data, batch_range=None, init_epoch=1, init_batchnum=None, dp_params={}, test=False):
+    def __init__(self, data, batch_range=None, init_epoch=1, init_batchnum=None, dp_params={}, test=False, fraction_test=0.01):
         if batch_range == None:
             raise Exception('the range is empty')
         if init_batchnum is None or init_batchnum not in batch_range:
@@ -24,7 +24,7 @@ class ScikitDataProvider(DataProvider):
 
         self.X = data[0]
         self.y = data[1]
-        self.fraction_test = 0.01
+        self.fraction_test = fraction_test
         if self.y is not None:
             print 'data is: {}, X shape {}, y shape {}'.format(len(data), self.X.shape,self.y.shape)
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y,

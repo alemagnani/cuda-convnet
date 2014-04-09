@@ -102,6 +102,8 @@ void Layer::fprop(NVMatrix& v, PASS_TYPE passType) {
 void Layer::fprop(NVMatrixV& v, PASS_TYPE passType) {
 	string t = string("fprop core ") +_type+ string( " , ")+ _name;
 	RANGE( t.c_str())
+	//cout << t.c_str() << "\n\n";
+
     assert(v.size() == _prev.size());
     _inputs.clear();
     _inputs.insert(_inputs.begin(), v.begin(), v.end());

@@ -38,8 +38,9 @@ from os import linesep as NL
 #import pylab as pl
 
 class ConvNet(IGPUModel):
-    def __init__(self, op, load_dic, dp_params={}):
+    def __init__(self, op, load_dic, dp_params={}, initialize_from_file=True):
         filename_options = []
+        self.initialize_from_file = initialize_from_file
         dp_params['multiview_test'] = op.get_value('multiview_test')
         dp_params['crop_border'] = op.get_value('crop_border')
         IGPUModel.__init__(self, "ConvNet", op, load_dic, filename_options, dp_params=dp_params)
@@ -57,10 +58,16 @@ class ConvNet(IGPUModel):
         print "init model state"
         ms = self.model_state
         if self.load_file:
-            print "init from file"
-            ms['layers'] = lay.LayerParser.parse_layers(self.layer_def, self.layer_params, self, ms['layers'])
+
+            if self.initialize_from_file:
+                ms['layers'] = lay.LayerParser.parse_layers(self.layer_def, self.layer_params, self, ms['layers'])
+            else:
+                ms['layers'] = lay.LayerParser.parse_layers_config(self.layer_def_dict, self.layer_params_dict, self, ms['layers'])
         else:
-            ms['layers'] = lay.LayerParser.parse_layers(self.layer_def, self.layer_params, self)
+            if self.initialize_from_file:
+                ms['layers'] = lay.LayerParser.parse_layers(self.layer_def, self.layer_params, self)
+            else:
+                ms['layers'] = lay.LayerParser.parse_layers_config(self.layer_def_dict, self.layer_params_dict, self)
         self.layers_dic = dict(zip([l['name'] for l in ms['layers']], ms['layers']))
         
         logreg_name = self.op.get_value('logreg_name')
@@ -178,7 +185,13 @@ class ConvNet(IGPUModel):
                 for j in xrange(len(v)):
                     test_outputs[0][0][k][j] += test_outputs[i][0][k][j]
         return (test_outputs[0][0], num_cases)
-    
+
+    def get_data_dims(self, idx):
+        return self.train_data_provider.get_data_dims(idx=idx)
+
+    def get_num_classes(self):
+        return self.train_data_provider.get_num_classes()
+
     @classmethod
     def get_options_parser(cls):
         op = IGPUModel.get_options_parser()
@@ -211,6 +224,5 @@ if __name__ == "__main__":
     op = ConvNet.get_options_parser()
 
     op, load_dic = IGPUModel.parse_options(op)
-    print 'load dict is {}'.format(load_dic)
     model = ConvNet(op, load_dic)
     model.start()

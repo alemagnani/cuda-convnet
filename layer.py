@@ -130,6 +130,11 @@ class MyConfigParser(cfg.SafeConfigParser):
     def safe_get_bool_list(self, section, option, default=None):
         return self.safe_get_list(section, option, lambda x: x.lower() in ('true', '1'), typestr='bools', default=default)
 
+    def read_dict(self, sections, defaults):
+        self._sections = sections
+        self._defaults = defaults
+
+
 # A class that implements part of the interface of MyConfigParser
 class FakeConfigParser(object):
     def __init__(self, dic):
@@ -256,6 +261,8 @@ class LayerParser:
             if len(layers) == 0:
                 mcp = MyConfigParser(dict_type=OrderedDict)
                 mcp.read([layer_cfg_path])
+
+
                 for name in mcp.sections():
                     if not mcp.has_option(name, 'type'):
                         raise LayerParsingError("Layer '%s': no type given" % name)
@@ -289,7 +296,47 @@ class LayerParser:
             print e
             sys.exit(1)
         return layers
-        
+
+    @staticmethod
+    def parse_layers_config(layer_cfg, param_cfg, model, layers=[]):
+        try:
+
+            if len(layers) == 0:
+                mcp = layer_cfg
+
+                for name in mcp.sections():
+                    if not mcp.has_option(name, 'type'):
+                        raise LayerParsingError("Layer '%s': no type given" % name)
+                    ltype = mcp.safe_get(name, 'type')
+                    if ltype not in layer_parsers:
+                        raise LayerParsingError("Layer '%s': Unknown layer type: '%s'" % (name, ltype))
+                    layers += [layer_parsers[ltype]().parse(name, mcp, layers, model)]
+
+                layers = LayerParser.detach_neuron_layers(layers)
+                for l in layers:
+                    lp = layer_parsers[l['type']]()
+                    l['parser'].optimize(layers)
+                    del l['parser']
+
+                for l in layers:
+                    if not l['type'].startswith('cost.'):
+                        found = max(l['name'] in [layers[n]['name'] for n in l2['inputs']] for l2 in layers if 'inputs' in l2)
+                        if not found:
+                            raise LayerParsingError("Layer '%s' of type '%s' is unused" % (l['name'], l['type']))
+
+            mcp = param_cfg
+
+            for l in layers:
+                if not mcp.has_section(l['name']) and l['requiresParams']:
+                    raise LayerParsingError("Layer '%s' of type '%s' requires extra parameters'." % (l['name'], l['type']))
+                lp = layer_parsers[l['type']]().init(l)
+                lp.add_params(mcp)
+                lp.dic['conserveMem'] = model.op.get_value('conserve_mem')
+        except LayerParsingError, e:
+            print e
+            sys.exit(1)
+        return layers
+
     @staticmethod
     def register_layer_parser(ltype, cls):
         if ltype in layer_parsers:
@@ -975,7 +1022,7 @@ class DataLayerParser(LayerParser):
     def parse(self, name, mcp, prev_layers, model):
         dic = LayerParser.parse(self, name, mcp, prev_layers, model)
         dic['dataIdx'] = mcp.safe_get_int(name, 'dataIdx')
-        dic['outputs'] = model.train_data_provider.get_data_dims(idx=dic['dataIdx'])
+        dic['outputs'] = model.get_data_dims(idx=dic['dataIdx'])
         
         print "Initialized data layer '%s', producing %d outputs" % (name, dic['outputs'])
         return dic
@@ -1101,9 +1148,9 @@ class LogregCostParser(CostParser):
             raise LayerParsingError("Layer '%s': dimensionality of first input must be 1" % name)
         if prev_layers[dic['inputs'][1]]['type'] != 'softmax':
             raise LayerParsingError("Layer '%s': second input must be softmax layer" % name)
-        if dic['numInputs'][1] != model.train_data_provider.get_num_classes():
+        if dic['numInputs'][1] != model.get_num_classes():
             raise LayerParsingError("Layer '%s': softmax input '%s' must produce %d outputs, because that is the number of classes in the dataset" \
-                                    % (name, prev_layers[dic['inputs'][1]]['name'], model.train_data_provider.get_num_classes()))
+                                    % (name, prev_layers[dic['inputs'][1]]['name'], model.get_num_classes()))
         
         print "Initialized logistic regression cost '%s'" % name
         return dic
@@ -1153,3 +1200,4 @@ neuron_parsers = sorted([NeuronParser('ident', 'f(x) = x', uses_acts=False, uses
                          ParamNeuronParser('brelu[a]', 'f(x) = min(a, max(0, x))', uses_acts=True, uses_inputs=False),
                          ParamNeuronParser('linear[a,b]', 'f(x) = a * x + b', uses_acts=True, uses_inputs=False)],
                         key=lambda x:x.type)
+

@@ -209,6 +209,7 @@ void ConvNet::copyToCPU() {
 }
 
 void ConvNet::copyToGPU() {
+
     for (int i = 0; i < _layers.size(); i++) {
         _layers[i]->copyToGPU();
     }
