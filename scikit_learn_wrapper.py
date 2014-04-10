@@ -4,22 +4,16 @@ import random
 from os.path import join
 import io
 import shutil
-from time import asctime, localtime, time
 from sklearn import datasets
-import scipy
-from scipy.sparse import csc_matrix, csr_matrix
+from scipy.sparse import  csr_matrix
 from sklearn.base import BaseEstimator, ClassifierMixin
-import sys
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.pipeline import Pipeline
 import convnet
-from sklearn.linear_model import SGDClassifier
-from data import DataProvider, DataProviderException
 from sklearn.cross_validation import train_test_split
 from optparse import OptionParser
 import numpy as np
-#from entropy_maximization.entropy_maximization_sgd import SGDEntropyMaximizationFast
 from gpumodel import IGPUModel
 from layer import MyConfigParser
 from ordereddict import OrderedDict
@@ -30,9 +24,6 @@ import logging
 
 
 logger = logging.getLogger(__name__)
-
-
-
 
 
 class ConvNetLearn(BaseEstimator, ClassifierMixin):
@@ -65,7 +56,7 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
             '--train-range': '1',
             '--save-path': output_folder,
             '--layer-params': '',
-            '--test-freq': '13',
+            '--test-freq': '10',
             '--data-provider': 'dp_scikit',
             '--epochs': epochs}
 

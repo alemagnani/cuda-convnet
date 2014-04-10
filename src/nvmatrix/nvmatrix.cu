@@ -913,7 +913,12 @@ void NVMatrix::pow(float p) {
 }
 
 void NVMatrix::scale(float _scale) {
-    scale(_scale, *this);
+
+		cublasSscal (getNumElements(), _scale, getDevData(), 1);
+	    checkCublasError("cublasSgemm failed");
+
+
+    //scale(_scale, *this);
 }
 
 void NVMatrix::scale(float _scale, NVMatrix& target) {
