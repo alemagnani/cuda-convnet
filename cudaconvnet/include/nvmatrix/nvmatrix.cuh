@@ -409,6 +409,7 @@ public:
     void add(NVMatrix& b, float scaleB);
     void add(NVMatrix& b, float scaleA, float scaleB);
     void add(NVMatrix& b);
+    void axpy(NVMatrix& b, float scaleB);
     void eltwiseMult(NVMatrix& b);
     void eltwiseMult(NVMatrix& b, NVMatrix& target);
     void eltwiseDivide(NVMatrix& b);

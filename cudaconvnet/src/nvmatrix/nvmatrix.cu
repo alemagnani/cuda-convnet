@@ -618,20 +618,41 @@ void NVMatrix::squaredDiff(NVMatrix& b, NVMatrix& target) {
 }
 
 void NVMatrix::add(NVMatrix& b, float scaleA, float scaleB, NVMatrix& target) {
-    if (scaleA == 0) {
-        b.scale(scaleB, target);
-        return;
-    }
-    //cout << "type b " << b.get_type() << " type target: " << target.get_type() << "\n\n";
-    assert(b.getNumCols() == target.getNumCols());
-    assert(b.getNumRows() == target.getNumRows());
+	if (scaleA == 0) {
+		b.scale(scaleB, target);
+		return;
+	}
 
-    if (scaleA == 1 && scaleB == 1) { // slight optimization
-        applyBinary(NVMatrixBinaryOps::Add(), b, target);
-    } else {
-        applyBinary(NVMatrixBinaryOps::WeightedAdd(scaleA, scaleB), b, target);
-    }
+	if (&target != this || !((b.isTrans() && isTrans()) || (!b.isTrans() && !isTrans()))){
+
+		//cout << "type b " << b.get_type() << " type target: " << target.get_type() << "\n\n";
+		assert(b.getNumCols() == target.getNumCols());
+		assert(b.getNumRows() == target.getNumRows());
+
+		if (scaleA == 1 && scaleB == 1) { // slight optimization
+			applyBinary(NVMatrixBinaryOps::Add(), b, target);
+		} else {
+			applyBinary(NVMatrixBinaryOps::WeightedAdd(scaleA, scaleB), b, target);
+		}
+	}else{
+		if (scaleA != 1){
+			scale(scaleA);
+		}
+		axpy(b, scaleB);
+	}
 }
+
+void NVMatrix::axpy(NVMatrix& b, float scaleB){
+	assert(b.getNumCols() == getNumCols());
+	 assert(b.getNumRows() == getNumRows());
+	 assert((b.isTrans() && isTrans()) || (!b.isTrans() && !isTrans()));
+
+	 cublasSaxpy ( getNumElements(), scaleB, b.getDevData(), 1,
+	                               getDevData(), 1);
+	 checkCublasError("cublasSgemm failed");
+}
+
+
 
 void NVMatrix::add(NVMatrix& b, float scaleB, NVMatrix& target) {
     add(b, 1, scaleB, target);
@@ -913,11 +934,8 @@ void NVMatrix::pow(float p) {
 }
 
 void NVMatrix::scale(float _scale) {
-
 		cublasSscal (getNumElements(), _scale, getDevData(), 1);
 	    checkCublasError("cublasSgemm failed");
-
-
     //scale(_scale, *this);
 }
 

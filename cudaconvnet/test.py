@@ -153,7 +153,7 @@ def main():
 
     with open(join(scenario_folder, 'matrices.npz'), 'rb') as wb_file:
             nbz = np.load(wb_file)
-            X_train_data, X_train_indices, X_train_indptr, X_train_shape, y_train, X_test_data, X_test_indices, X_test_indptr, X_test_shape, y_test = [
+            X_train_data, X_train_indices, X_train_indptr, X_train_shape, y_train, X_test_data, X_test_indices, X_test_indptr, X_test_shape, y_test, products_ids_train, products_ids_test, product_image_urls_train, product_image_urls_test = [
                 nbz[str(i)] for i in xrange(len(nbz.files))]
             X_train = csr_matrix((X_train_data, X_train_indices, X_train_indptr),
                                  shape=(X_train_shape[0], X_train_shape[1]))
