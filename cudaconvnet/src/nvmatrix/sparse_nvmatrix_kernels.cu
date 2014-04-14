@@ -96,13 +96,13 @@ __global__ void check_matrix(float * data, int* ind, int* ptr, int nzz, int size
 // performs C =  alpha A^T B + C where A is CSR sparse matr and B and C a re dense matrices in column major order A is m X n and  B is m X k and C is n * k
 
  // this implementation uses shared memory to cache the values of B
-/*
+
 __global__  void sparse_mul_trans(float alpha, int m, int n, int k,const float * data,const int* ind,const int* ptr, const float* B, float* C){
 	extern __shared__ volatile float b_row_cache[];
 	for(int row = blockIdx.x; row < m; row += gridDim.x){
 		//read b times alphs into cache
 		for (int colB = threadIdx.x; colB < k; colB += blockDim.x){
-			b_row_cache[colB] = alpha  * B[row + m * colB];
+			b_row_cache[colB] = alpha * B[row + m * colB];
 		}
 		__syncthreads();
 		const int begin = ptr[row];
@@ -118,26 +118,26 @@ __global__  void sparse_mul_trans(float alpha, int m, int n, int k,const float *
 		}
 	}
 }
-*/
 
 
+/*
 __global__  void sparse_mul_trans(float alpha, int m, int n, int k,const float * data,const int* ind,const int* ptr, const float* B, float* C){
 
 	for(int row = blockIdx.x; row < m; row += gridDim.x){
 		const int begin = ptr[row];
 		const int num_entries = ptr[row+1] - begin;
 		for (int pos = threadIdx.x; pos < num_entries; pos += blockDim.x){
-			const int kpos = pos+begin;
+			const int kpos = pos + begin;
 			const int target_row = ind[kpos];
-			const float val = data[kpos];
+			const float val = data[kpos] * alpha;
 
 			for (int colB = 0; colB < k; colB += 1){
-				atomicAdd(C+(target_row + colB * n), val * alpha  * B[row + m * colB]);
+				atomicAdd(C+(target_row + colB * n), val * B[row + m * colB]);
 			}
 		}
 	}
 }
-
+*/
 
 
 __global__ void read_one_entry(int* array, int pos_to_read, int * read_value){

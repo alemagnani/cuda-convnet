@@ -76,6 +76,7 @@ MatrixV* getMatrixV(PyObject* pyList) {
     		//cout << " got csr matrix";
     		vec->push_back( sparseMatrix);
     	}else{
+    	    //cout << " got dense matrix";
     		vec->push_back(new Matrix((PyArrayObject*)pythonMatrix));
     	}
     }

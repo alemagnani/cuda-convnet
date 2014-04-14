@@ -40,7 +40,9 @@ public:
     
     Data(std::vector<T*>& data) : _data(&data) {
         assert(_data->size() > 0);
+        //std::cout << "data size: " << data.size() << "\n";
         for (int i = 1; i < data.size(); i++) {
+        	//std::cout << "dim1: " << data[i-1]->getNumRows() << ", "<< data[i-1]->getNumCols() << " dim2: " << data[i]->getNumRows() << ", " <<  data[i]->getNumCols()<< "\n";
             assert(data[i-1]->getLeadingDim() == data[i]->getLeadingDim());
         }
         assert(data[0]->getLeadingDim() > 0);

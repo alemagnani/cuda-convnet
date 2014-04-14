@@ -61,7 +61,7 @@ class ScikitDataProvider(DataProvider):
 def adjust_labels(labels):
     n = labels.shape[0]
     out = np.require(labels.reshape((1, n)), dtype=np.float32, requirements='C')
-    print 'shape of labels is {}'.format(out.shape)
+    #print 'shape of labels is {}'.format(out.shape)
     return out
 
 
@@ -69,13 +69,13 @@ def expand(matrix):
     if isinstance(matrix, csr_matrix):
         check_correct_indeces(matrix)
         rows, cols = matrix.shape
-        print "matrix output has size {}, {}".format(cols,rows)
+        #print "matrix output has size {}, {}".format(cols,rows)
 
         return [np.require(matrix.data, dtype=np.float32, requirements='C'),np.require( matrix.indices, dtype=np.int32, requirements='C'), np.require(matrix.indptr, dtype=np.int32, requirements='C'), cols, rows]
     else:
-        print 'working with a dense matrix'
+        #print 'working with a dense matrix'
         out =  np.require(matrix.T, dtype=np.float32, requirements='C')
-        print 'the shape is {}'.format(out.shape)
+        #print 'the shape is {}'.format(out.shape)
         return out
 
 def check_correct_indeces(X):

@@ -226,14 +226,19 @@ class IGPUModel:
     def aggregate_test_outputs(self, test_outputs):
         test_error = tuple([sum(t[r] for t in test_outputs) / (1 if self.test_one else len(self.test_batch_range)) for r in range(len(test_outputs[-1]))])
         return test_error
-    
+
+    def get_num_test_batches(self):
+        return self.test_batch_range[-1]
+
     def get_test_error(self):
         next_data = self.get_next_batch(train=False)
         test_outputs = []
+
         while True:
             data = next_data
             self.start_batch(data, train=False)
-            load_next = not self.test_one and data[1] < self.test_batch_range[-1]
+
+            load_next = not self.test_one and data[1] < self.get_num_test_batches()
             if load_next: # load next batch
                 next_data = self.get_next_batch(train=False)
             test_outputs += [self.finish_batch()]

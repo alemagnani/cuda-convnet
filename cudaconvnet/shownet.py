@@ -66,7 +66,10 @@ class ShowConvNet(ConvNet):
     def init_model_state(self):
         #ConvNet.init_model_state(self)
         if self.op.get_value('show_preds'):
+            print 'option show preds available'
             self.sotmax_idx = self.get_layer_idx(self.op.get_value('show_preds'), check_type='softmax')
+        else:
+            print 'option show preds NOT available'
         if self.op.get_value('write_features'):
             self.ftr_layer_idx = self.get_layer_idx(self.op.get_value('write_features'))
             
@@ -176,16 +179,24 @@ class ShowConvNet(ConvNet):
         filters = filters / filters.max()
 
         self.make_filter_fig(filters, filter_start, 2, 'Layer %s' % self.show_filters, num_filters, combine_chans)
-    
+
+
+
+    def get_plottable_data(self, data):
+        return self.test_data_provider.get_plottable_data(data)
+
+    def get_label_names(self):
+        return self.test_data_provider.batch_meta['label_names']
+
     def plot_predictions(self):
         data = self.get_next_batch(train=False)[2] # get a test batch
-        num_classes = self.test_data_provider.get_num_classes()
+        num_classes = self.get_num_classes()
         NUM_ROWS = 2
         NUM_COLS = 4
         NUM_IMGS = NUM_ROWS * NUM_COLS
         NUM_TOP_CLASSES = min(num_classes, 4) # show this many top labels
         
-        label_names = self.test_data_provider.batch_meta['label_names']
+        label_names = self.get_label_names()
         if self.only_errors:
             preds = n.zeros((data[0].shape[1], num_classes), dtype=n.single)
         else:
@@ -205,7 +216,7 @@ class ShowConvNet(ConvNet):
             err_idx = nr.permutation(n.where(preds.argmax(axis=1) != data[1][0,:])[0])[:NUM_IMGS] # what the net got wrong
             data[0], data[1], preds = data[0][:,err_idx], data[1][:,err_idx], preds[err_idx,:]
             
-        data[0] = self.test_data_provider.get_plottable_data(data[0])
+        data[0] = self.get_plottable_data(data[0])
         for r in xrange(NUM_ROWS):
             for c in xrange(NUM_COLS):
                 img_idx = r * NUM_COLS + c

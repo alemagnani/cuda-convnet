@@ -9,6 +9,7 @@ from scipy.sparse import  csr_matrix
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.metrics import accuracy_score
 from sklearn.pipeline import Pipeline
 import convnet
 from sklearn.cross_validation import train_test_split
@@ -21,10 +22,38 @@ import scikit_data_provider
 import shownet
 
 import logging
-
+import pylab as pl
 
 logger = logging.getLogger(__name__)
 
+class InMemorySplitDataProvider:
+    def __init__(self,X, y, fraction_test=0.05):
+        print 'X shape {}, y shape {}'.format( X.shape,y.shape)
+        X_train, X_test, y_train, y_test = train_test_split(X, y,test_size=fraction_test,random_state=42)
+
+        self.x_size = X_train.shape[1]
+        self.num_classes = np.max(X_test)+1
+        self.out_train = [scikit_data_provider.expand(X_train), scikit_data_provider.adjust_labels(y_train)]
+        self.out_test = [scikit_data_provider.expand(X_test), scikit_data_provider.adjust_labels(y_test)]
+        self.epoch_count = 0
+
+    def get_num_test_batches(self):
+        return 1
+
+    def get_next_batch(self, train=True):
+                if train:
+                    self.epoch_count += 1
+                    return [self.epoch_count, 1 ,self.out_train]
+                else:
+                    return [self.epoch_count, 1, self.out_test]
+    def get_data_dims(self, idx):
+        return self.x_size if idx == 0 else 1
+
+    def get_num_classes(self):
+        return self.num_classes
+
+    def init_data_providers(self):
+            self.epoch_count = 0
 
 class ConvNetLearn(BaseEstimator, ClassifierMixin):
     def __init__(self, layer_file, layer_params_file, output_folder="/tmp/convnet", epochs=400, fraction_test=0.01, mcp_layers=None, mcp_params=None, last_model=None):
@@ -107,14 +136,39 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
 
 
 
-    def fit(self, X, y, **kwargs):
+    def fit(self, X, y, use_starting_point=False, **kwargs):
         print 'about to fit ConvNetLearn'
-        op = convnet.ConvNet.get_options_parser()
+        if use_starting_point and self.last_model is not None:
+            self.dict['-f']=self.last_model
 
+        op = convnet.ConvNet.get_options_parser()
         op.parse_from_dictionary(self.dict)
+
+
+        load_dic = None
+        options = op.options
+        if options["load_file"].value_given:
+            print 'load file option provided'
+            load_dic = IGPUModel.load_checkpoint(options["load_file"].value)
+            old_op = load_dic["op"]
+            old_op.merge_from(op)
+            op = old_op
         op.eval_expr_defaults()
 
-        num_classes = y.max()+1
+
+        try:
+            self.dict.pop('-f')
+        except:
+            pass
+
+
+        if hasattr(X, 'get_next_batch'):
+            data_provider = X
+        else:
+            data_provider = InMemorySplitDataProvider(X,y,fraction_test=self.fraction_test)
+
+
+        num_classes = data_provider.get_num_classes()
         logger.info('num classes {}'.format(num_classes))
 
 
@@ -126,46 +180,31 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
         ##################
 
 
-
-
-        print 'X shape {}, y shape {}'.format( X.shape,y.shape)
-        X_train, X_test, y_train, y_test = train_test_split(X, y,test_size=self.fraction_test,random_state=42)
-
-
-        out_train = [scikit_data_provider.expand(X_train), scikit_data_provider.adjust_labels(y_train)]
-        out_test = [scikit_data_provider.expand(X_test), scikit_data_provider.adjust_labels(y_test)]
-
-
         class MyConvNet(convnet.ConvNet):
 
             def __init__(self, op, load_dic, mcp_layers, mcp_params, fraction_test):
                   self.layer_def_dict = mcp_layers
-                  self.fraction_test = fraction_test
-                  self.epoch_count = 0
-
                   self.layer_params_dict = mcp_params
                   convnet.ConvNet.__init__(self,op,load_dic=load_dic,initialize_from_file=False)
+                  self.test_one = True
+                  self.epoch = 1
 
             def get_data_dims(self, idx):
-                return X.shape[1] if idx == 0 else 1
+                return data_provider.get_data_dims(idx)
 
             def get_num_classes(self):
-                return num_classes
+                return data_provider.get_num_classes()
 
             def get_next_batch(self, train=True):
-                if train:
-                    self.epoch_count += 1
-                    return [self.epoch_count, 1 ,out_train]
-                else:
-                    return [self.epoch_count, 1, out_test]
+                return data_provider.get_next_batch(train)
 
-
+            def get_num_test_batches(self):
+                return data_provider.get_num_test_batches()
 
             def init_data_providers(self):
-                self.dp_params['convnet'] = self
-                self.epoch_count = 0
+                data_provider.init_data_providers()
 
-        model = MyConvNet(op, load_dic=None, mcp_layers=self.mcp_layers, mcp_params=self.mcp_params, fraction_test=self.fraction_test)
+        model = MyConvNet(op, load_dic=load_dic, mcp_layers=self.mcp_layers, mcp_params=self.mcp_params, fraction_test=self.fraction_test)
 
         self.last_model = join(self.output_folder, model.save_file)
         print 'last model name {}'.format(self.last_model)
@@ -197,28 +236,101 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
             op = old_op
         op.eval_expr_defaults()
 
+        if hasattr(X, 'get_next_batch'):
+            data_provider = X
+        else:
+            data_provider = InMemorySplitDataProvider(X,None,fraction_test=0.0)
+
 
         class MyConvNet(shownet.ShowConvNet):
             def init_data_providers(self):
                 self.dp_params['convnet'] = self
 
             def compute_probs(self, X):
-                data_point =X.shape[0]
-                data = [scikit_data_provider.expand(X), scikit_data_provider.adjust_labels( np.array([0] * data_point,dtype=np.float32))]
-                num_ftrs = self.layers[self.ftr_layer_idx]['outputs']
+                out = None
 
-                ftrs = np.zeros((data_point, num_ftrs), dtype=np.single)
-                self.libmodel.startFeatureWriter(data + [ftrs], self.ftr_layer_idx)
+                while True:
+                    data_all = X.get_next_batch(train=True)
+                    epoch, batch = data_all[0], data_all[1]
+                    if epoch != 1:
+                        break
+                    print 'working on epoch: {}, batch: {}'.format(epoch, batch)
+                    data = data_all[2]
+                    data_point = data[0].shape[1]
 
-                self.finish_batch()
+                    num_ftrs = self.layers[self.ftr_layer_idx]['outputs']
 
-                return ftrs
+                    ftrs = np.zeros((data_point, num_ftrs), dtype=np.single)
+                    self.libmodel.startFeatureWriter(data + [ftrs], self.ftr_layer_idx)
+
+                    self.finish_batch()
+                    if out is None:
+                        out = ftrs
+                    else:
+                        out = np.vstack((out,ftrs))
+                return out
+        model = MyConvNet(op, load_dic=load_dic)
+        probs = model.compute_probs(data_provider)
+        model.cleanup()
+        return probs
+
+    def plot_predictions(self, data_provider, output_file='/tmp/predictions.png'):
+        op = shownet.ShowConvNet.get_options_parser()
+
+        predict_dict =  {
+            '--write-features': 'probs',
+            '--feature-path' : '/tmp/feature_path',
+            '--test-range': '2',
+            '--train-range': '1',
+            '--show-preds' : 'probs',
+            '-f': self.last_model,
+            '--data-provider': 'dp_scikit',
+            '--multiview-test': 0,
+            '--logreg-name': 'aaa'
+            }
+
+        op.parse_from_dictionary(predict_dict)
+        load_dic = None
+        options = op.options
+        if options["load_file"].value_given:
+            print 'load file option provided'
+            load_dic = IGPUModel.load_checkpoint(options["load_file"].value)
+            old_op = load_dic["op"]
+            old_op.merge_from(op)
+            op = old_op
+        op.eval_expr_defaults()
+
+
+
+        class MyConvNet(shownet.ShowConvNet):
+            def get_data_dims(self, idx):
+                return data_provider.get_data_dims(idx)
+
+            def get_num_classes(self):
+                return data_provider.get_num_classes()
+
+            def get_next_batch(self, train=True):
+                return data_provider.get_next_batch(train)
+
+            def get_num_test_batches(self):
+                return data_provider.get_num_test_batches()
+
+            def get_plottable_data(self, data):
+                return data_provider.get_plottable_data(data)
+
+            def init_data_providers(self):
+                data_provider.init_data_providers()
+
+            def get_label_names(self):
+                return data_provider.get_label_names()
+
 
 
         model = MyConvNet(op, load_dic=load_dic)
-        probs =  model.compute_probs(X)
+        model.plot_predictions()
+        pl.savefig(output_file)
         model.cleanup()
-        return probs
+
     def predict(self,X):
         probs = self.predict_proba(X)
         return np.argmax(probs, axis=1)
@@ -227,7 +339,28 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
         probs = self.predict_proba(X)
         return np.max(probs, axis=1)
 
+    def score(self, X, y):
+        if hasattr(X, 'get_next_batch'):
+            data_provider = X
+        else:
+            data_provider = InMemorySplitDataProvider(X,None,fraction_test=0.0)
 
+
+        y = None
+        while True:
+                    data_all = X.get_next_batch(train=True)
+                    epoch, batch = data_all[0], data_all[1]
+                    if epoch != 1:
+                        break
+                    print 'working on epoch: {}, batch: {}'.format(epoch, batch)
+                    y_local = data_all[2][1]
+                    if y is None:
+                        y = y_local
+                    else:
+                        y = np.vstack((y,y_local))
+        
+
+        return accuracy_score(y, self.predict(X))
 
 
 def main():

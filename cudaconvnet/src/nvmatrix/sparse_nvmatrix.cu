@@ -253,8 +253,8 @@ void SparseNVMatrix::addProductChanged( const NVMatrix &b, float scaleTarget, fl
 			//cout << "finally pippo num thread: " << numThread << "nzz: "<< _nzz << " numCOls: "<< getNumCols()<< "\n";
 			dim3 threads(numThread);
 			dim3 blocks(std::min(NUM_BLOCKS_MAX, getNumCols()));
-			//sparse_mul_trans<<<blocks,threads, b.getNumCols() * sizeof(float)>>>(scaleAB, getNumCols(), getNumRows(), b.getNumCols(), getDevData(), _sparseInd, _sparsePtr, b.getDevData(), target.getDevData());
-			sparse_mul_trans<<<blocks,threads>>>(scaleAB, getNumCols(), getNumRows(), b.getNumCols(), getDevData(), _sparseInd, _sparsePtr, b.getDevData(), target.getDevData());
+			sparse_mul_trans<<<blocks,threads, b.getNumCols() * sizeof(float)>>>(scaleAB, getNumCols(), getNumRows(), b.getNumCols(), getDevData(), _sparseInd, _sparsePtr, b.getDevData(), target.getDevData());
+			//sparse_mul_trans<<<blocks,threads>>>(scaleAB, getNumCols(), getNumRows(), b.getNumCols(), getDevData(), _sparseInd, _sparsePtr, b.getDevData(), target.getDevData());
 
 		}else{
 			cusparseStatus_t cusparseStatus = cusparseScsrmm2(cudaSetup::_cusparseHandle, CUSPARSE_OPERATION_TRANSPOSE ,b.isTrans()?CUSPARSE_OPERATION_NON_TRANSPOSE: CUSPARSE_OPERATION_TRANSPOSE,
