@@ -74,14 +74,14 @@ def main():
     num_classes = data_provider.get_num_classes()
     print 'num classes: {}'.format(num_classes)
 
-    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=3, fraction_test=0.05, last_model=opts.previous_model)
+    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=2, fraction_test=0.05, last_model=opts.previous_model)
 
     #net.plot_predictions(data_provider,opts.previous_model)
 
     net.fit(data_provider, None, use_starting_point=True)
 
-    net.score(ImageDataProvider(batch_folder, 'train', test_interval=0, label_transformer=labelEncoder,max_batch=3), None)
-
+    sc = net.score(ImageDataProvider(batch_folder, 'train', test_interval=0, label_transformer=labelEncoder,max_batch=30), None)
+    print 'score is {}'.format(sc)
 
 class LabelL0Encoder:
     def __init__(self, tree_data, labelEncoder):

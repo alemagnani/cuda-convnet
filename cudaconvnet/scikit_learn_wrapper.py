@@ -167,6 +167,7 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
         else:
             data_provider = InMemorySplitDataProvider(X,y,fraction_test=self.fraction_test)
 
+        data_provider.init_data_providers()
 
         num_classes = data_provider.get_num_classes()
         logger.info('num classes {}'.format(num_classes))
@@ -241,6 +242,7 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
         else:
             data_provider = InMemorySplitDataProvider(X,None,fraction_test=0.0)
 
+        data_provider.init_data_providers()
 
         class MyConvNet(shownet.ShowConvNet):
             def init_data_providers(self):
@@ -333,7 +335,10 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
 
     def predict(self,X):
         probs = self.predict_proba(X)
-        return np.argmax(probs, axis=1)
+        print 'size of probs {}'.format(probs.shape)
+        out =  np.argmax(probs, axis=1)
+        print 'size of out {}'.format(out.shape)
+        return out
 
     def predict_best_proba(self, X, **kwargs):
         probs = self.predict_proba(X)
@@ -343,22 +348,25 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
         if hasattr(X, 'get_next_batch'):
             data_provider = X
         else:
-            data_provider = InMemorySplitDataProvider(X,None,fraction_test=0.0)
+            data_provider = InMemorySplitDataProvider(X, y, fraction_test=0.0)
 
 
         y = None
+        data_provider.init_data_providers()
         while True:
-                    data_all = X.get_next_batch(train=True)
+                    data_all = data_provider.get_next_batch(train=True)
                     epoch, batch = data_all[0], data_all[1]
+                    print 'epoch is {}'.format(epoch)
                     if epoch != 1:
                         break
                     print 'working on epoch: {}, batch: {}'.format(epoch, batch)
-                    y_local = data_all[2][1]
+                    y_local = data_all[2][1].T
+                    print 'y_local shape {}'.format(y_local.shape)
                     if y is None:
                         y = y_local
                     else:
-                        y = np.vstack((y,y_local))
-        
+                        y = np.vstack((y, y_local))
+        print 'shape y {}'.format(y.shape)
 
         return accuracy_score(y, self.predict(X))
 
