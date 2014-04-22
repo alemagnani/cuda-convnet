@@ -166,6 +166,15 @@ public:
     EltwiseSumLayer(ConvNet* convNet, PyObject* paramsDict);
 };
 
+class UnionLayer : public Layer {
+protected:
+    void fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType);
+    void bpropActs(NVMatrix& v, int inpIdx, float scaleTargets, PASS_TYPE passType);
+public:
+    UnionLayer(ConvNet* convNet, PyObject* paramsDict);
+};
+
+
 class EltwiseMaxLayer : public Layer {
 protected:
     void fpropActs(int inpIdx, float scaleTargets, PASS_TYPE passType);

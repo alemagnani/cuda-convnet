@@ -1,3 +1,4 @@
+import base64
 import cStringIO
 import gzip
 from optparse import OptionParser
@@ -6,9 +7,11 @@ import urllib
 
 from PIL import Image
 import cPickle
+import datetime
 from joblib import Parallel, delayed
 import numpy as np
 from os.path import join
+from pymongo import MongoClient
 from scipy.sparse import csr_matrix
 from scikit_data_provider import expand, adjust_labels
 import pylab as pl
@@ -31,8 +34,9 @@ def process(image):
 
 
 #the image is deformed to fit the size given
-def load_resize(url, size):
-    file = cStringIO.StringIO(urllib.urlopen(url).read())
+def load_resize(file, size):
+    #file = cStringIO.StringIO(urllib.urlopen(url).read())
+
     im = Image.open(file, mode='r')
     im = im.convert('RGB')
     out = im.resize(size, Image.ANTIALIAS)
@@ -40,17 +44,17 @@ def load_resize(url, size):
     return out
 
 
-def process_product_image(image_url, size=(32, 32)):
+def process_product_image(file, size=(32, 32)):
     try:
-        im = load_resize(image_url, size)
+        im = load_resize(file, size)
     except Exception as e:
         #print 'cannot load image from {} because {}'.format(image_url,e)
         return None
     return process(im)
 
 
-def process_batch(image_urls, size=(32, 32), n_jobs=5):
-    return transform(image_urls, process_product_image, n_jobs=n_jobs, size=size)
+def process_batch(files, size=(32, 32), n_jobs=5):
+    return transform(files, process_product_image, n_jobs=n_jobs, size=size)
 
 
 class ImageDataProvider:
@@ -62,13 +66,18 @@ class ImageDataProvider:
         self.folder = folder
         self.epoch_count_train = 1
         self.epoch_count_test = 1
-        mean_file = join(folder, '{}_{}.p.gz'.format(prefix, 'mean'))
+        mean_file = join(folder, '{}_{}.p.gz'.format('train', 'mean'))  # the mean can only be coming from the train data
         with gzip.open(mean_file, 'rb') as mf:
             self.mean = cPickle.load(mf)
         self.label_transformer = label_transformer
         self.test_batches = None
         self.img_size = 64
         self.max_batch = max_batch
+
+        fname = join(self.folder, '{}_{}.p.gz'.format(self.prefix, '1'))
+        with gzip.open(fname, 'rb') as f:
+                X_batch, y_batch, image_data = cPickle.load(f)
+        self.text_size = X_batch.shape[1]
 
 
     def get_num_test_batches(self):
@@ -112,7 +121,8 @@ class ImageDataProvider:
             else:
                 batch = self.current_train_index
             transform_y = self.label_transformer.transform(y_batch)
-            out = [epoch, batch, [expand(image_data), adjust_labels(transform_y)]]
+            print 'image data shape: {}, X_batch data shape: {}'.format(image_data.shape,X_batch.shape)
+            out = [epoch, batch, [expand(image_data), adjust_labels(transform_y), expand(X_batch)]]
             self.current_train_index += 1
             if not (self.test_interval is None or self.test_interval <= 1):
                 if self.current_train_index % self.test_interval == 0:
@@ -134,9 +144,9 @@ class ImageDataProvider:
 
             epoch = self.epoch_count_test
             batch = self.current_test_index / self.test_interval
-
+            print 'image data shape: {}, X_batch data shape: {}'.format(image_data.shape,X_batch.shape)
             transform_y = self.label_transformer.transform(y_batch)
-            out = [epoch, batch, [expand(image_data), adjust_labels(transform_y)]]
+            out = [epoch, batch, [expand(image_data), adjust_labels(transform_y), expand(X_batch)]]
             self.current_test_index += self.test_interval
 
             return out
@@ -145,7 +155,14 @@ class ImageDataProvider:
         return self.label_transformer.get_label_names()
 
     def get_data_dims(self, idx):
-        return self.mean.shape[0] if idx == 0 else 1
+        if idx == 0:
+            return self.mean.shape[0]
+        elif idx == 1:
+            return 1
+        elif idx == 2:
+            return self.text_size
+        else:
+            raise Exception('data index out of dound {}'.format(idx))
 
     def get_num_classes(self):
         return self.label_transformer.get_num_classes()
@@ -160,12 +177,21 @@ class ImageDataProvider:
 def main():
     op = OptionParser()
 
-    op.add_option("--data_folder", default='/home/alessandro/autotagData/test1',
+    op.add_option("--data_folder", default='/data/sgeadmin/productTypeTest',
                   action="store", type=str, dest="data_folder",
                   help="Product data file.")
-    op.add_option("--output_folder", default='/home/alessandro/autotagData/test1/batches',
+
+    op.add_option("--output_folder_images", default='/data/sgeadmin/productTypeTest/images',
+                  action="store", type=str, dest="output_folder_images",
+                  help="Output folder.")
+
+    op.add_option("--output_folder", default='/data/sgeadmin/productTypeTest/batches',
                   action="store", type=str, dest="output_folder",
                   help="Output folder.")
+
+    op.add_option("--mongo_url", default='starcluster-gw-vip.prod.aws.adchemy.net',
+                  action="store", type=str, dest="mongo_url",
+                  help="Mongo url.")
 
     (opts, args) = op.parse_args()
 
@@ -190,10 +216,93 @@ def main():
         print 'X_train %s, y_train %s, X_test %s, y_test %s' % (
             X_train.shape, len(y_train), X_test.shape, len(y_test))
 
-    create_batch(output_folder, X_train, y_train, product_image_urls_train, batch_size=batch_size, size=size,
-                 n_jobs=n_jobs, prefix='train')
-    create_batch(output_folder, X_test, y_test, product_image_urls_test, batch_size=batch_size, size=size,
-                 n_jobs=n_jobs, prefix='test')
+    image_storage = ImageStorage(output_folder=opts.output_folder_images, url=opts.mongo_url)
+    download_files = False
+    if download_files:
+
+        image_storage.download_images(product_image_urls_train)
+        image_storage.download_images(product_image_urls_test)
+    else:
+        print 'creating batches'
+        product_image_files_train = [image_storage.get_image_location(url) for url in product_image_urls_train]
+        print 'startgin batch creation for {} filesin train'.format(len(product_image_urls_train))
+        create_batch(output_folder, X_train, y_train, product_image_files_train, batch_size=batch_size, size=size,
+               n_jobs=n_jobs, prefix='train')
+        print 'startgin batch creation for {} files in test'.format(len(product_image_urls_test))
+        product_image_files_test = [image_storage.get_image_location(url) for url in product_image_urls_test]
+        create_batch(output_folder, X_test, y_test, product_image_files_test, batch_size=batch_size, size=size,
+                  n_jobs=n_jobs, prefix='test')
+
+
+
+
+IMAGE_URL='image_url'
+IMAGE_LOCATION = 'file_name'
+
+class ImageStorage(object):
+
+    def __init__(self, url='rsrch-mysql-db01.dev.adchemy.colo', port=27017, db='image_storage',
+                 collection='image_metadata', output_folder='/tmp/images/'):
+        self.client = MongoClient(url, port)
+        self.db = self.client[db]
+        self.collection = self.db[collection]
+        self.collection_name = collection
+        self.db_name = db
+        self.url = url
+        self.port = port
+        self.output_folder = output_folder
+
+        self.collection.ensure_index(IMAGE_URL, name=IMAGE_URL, unique=True)
+        self.collection.ensure_index(IMAGE_LOCATION, name=IMAGE_LOCATION)
+
+    def clear(self):
+        self.collection.remove()
+
+    def get_image_location(self, url):
+        doc = self.collection.find_one({IMAGE_URL : url})
+        if doc is None:
+            return None
+        return doc.get(IMAGE_LOCATION)
+
+    def download_image(self,url):
+        self._download_images_batch([url], n_jobs=1)
+
+    def download_images(self, urls, n_jobs=10):
+        i = 0
+        batch_size = 2000
+        while i < len(urls):
+            print 'totally processed {}'.format(i)
+            end = min(i+ batch_size, len(urls))
+            self._download_images_batch(urls[i: end], n_jobs=n_jobs)
+            i = end
+
+    def _download_images_batch(self, urls, n_jobs=5):
+        FORMAT = '%Y%m%d%H%M%S'
+        data_folder = 'data_{}'.format(datetime.datetime.now().strftime(FORMAT))
+        new_folder = join(self.output_folder, data_folder)
+        if not os.path.isdir(new_folder):
+            os.mkdir(new_folder)
+        not_available_urls = [ url for url in urls if (url is not None and len(url) > 0 and not self.collection.find_one({IMAGE_URL : url}))]
+        print 'urls are {}, the one to download are {}'.format(len(urls), len(not_available_urls))
+        downloaded = Parallel(n_jobs=n_jobs)( delayed(_download_image)( url, new_folder) for url in not_available_urls)
+        for url, full_path in downloaded:
+            self.collection.update({IMAGE_URL : url}, {IMAGE_URL : url, IMAGE_LOCATION : full_path}, upsert=True )
+
+def _download_image(  url, output_folder):
+            full_path = join(output_folder, get_file_name(url))
+            #print 'full path is {} for image {}'.format(full_path, url)
+            try:
+                urllib.urlretrieve(url, full_path)
+                return url, full_path
+
+            except Exception as e:
+                #print 'cannot download image {} because {}'.format(url, e)
+                return url, None
+
+
+
+def get_file_name(url):
+    return base64.urlsafe_b64encode(url)
 
 
 def compute_means_save(output_folder, batch_means, prefix):
@@ -204,19 +313,19 @@ def compute_means_save(output_folder, batch_means, prefix):
         cPickle.dump(mean, f)
 
 
-def create_batch(output_folder, X, y, image_urls, batch_size=100, size=(32, 32), n_jobs=5, prefix='batch'):
+def create_batch(output_folder, X, y, image_files, batch_size=100, size=(32, 32), n_jobs=5, prefix='batch'):
     batch_means = []
     left_over_indices = []
     left_over_images = []
     indices = []
-    batch_urls = []
+    batch_files = []
     batch_index = 1
-    for i, image_url in enumerate(image_urls):
-        if image_url is not None and len(image_url) > 0:
+    for i, image_file in enumerate(image_files):
+        if image_file is not None and len(image_file) > 0:
             indices.append(i)
-            batch_urls.append(image_url)
-            if len(batch_urls) == batch_size:
-                image_batch, good_indices = process_batch(batch_urls, size=size, n_jobs=n_jobs)
+            batch_files.append(image_file)
+            if len(batch_files) == batch_size:
+                image_batch, good_indices = process_batch(batch_files, size=size, n_jobs=n_jobs)
                 indices = [indices[index] for index in good_indices]
 
                 assert (len(image_batch) == len(indices))
@@ -227,7 +336,7 @@ def create_batch(output_folder, X, y, image_urls, batch_size=100, size=(32, 32),
                 left_over_indices.extend(indices)
                 left_over_images.extend(image_batch)
                 indices = []
-                batch_urls = []
+                batch_files = []
 
         if len(left_over_indices) >= batch_size:
             bi = left_over_indices[0:batch_size]

@@ -24,6 +24,7 @@
 
 import numpy
 import getopt as opt
+from cudaconvnet import scikit_data_provider
 from util import *
 from math import sqrt, ceil, floor
 from gpumodel import IGPUModel
@@ -189,6 +190,7 @@ class ShowConvNet(ConvNet):
         return self.test_data_provider.batch_meta['label_names']
 
     def plot_predictions(self):
+
         data = self.get_next_batch(train=False)[2] # get a test batch
         num_classes = self.get_num_classes()
         NUM_ROWS = 2
@@ -202,8 +204,9 @@ class ShowConvNet(ConvNet):
         else:
             preds = n.zeros((NUM_IMGS, num_classes), dtype=n.single)
             rand_idx = nr.randint(0, data[0].shape[1], NUM_IMGS)
-            data[0] = n.require(data[0][:,rand_idx], requirements='C')
-            data[1] = n.require(data[1][:,rand_idx], requirements='C')
+            for idf in xrange(len(data)):
+                    data[idf] = scikit_data_provider.slice(data[idf],rand_idx)
+            #data[1] = n.require(data[1][:,rand_idx], requirements='C')
         data += [preds]
 
         # Run the model
@@ -214,7 +217,9 @@ class ShowConvNet(ConvNet):
         fig.text(.4, .95, '%s test case predictions' % ('Mistaken' if self.only_errors else 'Random'))
         if self.only_errors:
             err_idx = nr.permutation(n.where(preds.argmax(axis=1) != data[1][0,:])[0])[:NUM_IMGS] # what the net got wrong
-            data[0], data[1], preds = data[0][:,err_idx], data[1][:,err_idx], preds[err_idx,:]
+            for idf in xrange(len(data)-1):
+                    data[idf] = scikit_data_provider.slice(data[idf],err_idx)
+            preds = preds[err_idx,:]
             
         data[0] = self.get_plottable_data(data[0])
         for r in xrange(NUM_ROWS):
@@ -241,11 +246,13 @@ class ShowConvNet(ConvNet):
                 width = max(ylocs)
                 pl.barh(ylocs, [l[0]*width for l in img_labels], height=height, \
                         color=['r' if l[1] == label_names[true_label] else 'b' for l in img_labels])
-                pl.title(label_names[true_label])
-                pl.yticks(ylocs + height/2, [l[1] for l in img_labels])
+                pl.title(label_formatter(label_names[true_label]))
+                pl.yticks(ylocs + height/2, [label_formatter(l[1]) for l in img_labels])
                 pl.xticks([width/2.0, width], ['50%', ''])
                 pl.ylim(0, ylocs[-1] + height*2)
-    
+
+
+
     def do_write_features(self):
         if not os.path.exists(self.feature_path):
             os.makedirs(self.feature_path)
@@ -305,7 +312,10 @@ class ShowConvNet(ConvNet):
         
         op.options['load_file'].default = None
         return op
-    
+
+def label_formatter(label):
+    return label.split('_')[0]
+
 if __name__ == "__main__":
     try:
         op = ShowConvNet.get_options_parser()

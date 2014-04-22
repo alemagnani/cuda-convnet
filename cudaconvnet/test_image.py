@@ -1,42 +1,40 @@
 from optparse import OptionParser
 from os.path import join
+
 import numpy as np
 from scipy.sparse import csr_matrix
 from sklearn import preprocessing
-import json
+
 from experiments.tree_data import TreeNodeData
-from experiments.collect_images import ImageDataProvider
-
+from cudaconvnet.collect_images import ImageDataProvider
 from scikit_learn_wrapper import ConvNetLearn
-
-
 
 
 def main():
     op = OptionParser()
 
-    op.add_option("--data_folder", default='/home/ubuntu/test1',
+    op.add_option("--data_folder", default='/mnt/image_data',
                   action="store", type=str, dest="data_folder",
                   help="Product data file.")
 
-    op.add_option("--batch_folder", default='/mnt/image_data/batches',
+    op.add_option("--batch_folder", default='/mnt/image_data/footwear_1361407141225_1361407159889_75',
                   action="store", type=str, dest="batch_folder",
                   help="Product data batch folder .")
 
-    op.add_option("--product_type_file", default='/home/ubuntu/test1/product_type.json',
+    op.add_option("--product_type_file", default='/mnt/image_data/product_type.json',
                   action="store", type=str, dest="product_type_file",
                   help="Product type  file.")
 
 
-    op.add_option("--layer_def", default='./example-layers/layers-conv-local-13pct.cfg',
+    op.add_option("--layer_def", default='./example-layers/layers-80sec.cfg',
                   action="store", type=str, dest="layer_def",
                   help="Layer definition.")
 
-    op.add_option("--layer_params", default='./example-layers/layer-params-conv-local-13pct.cfg',
+    op.add_option("--layer_params", default='./example-layers/layer-params-80sec.cfg',
                   action="store", type=str, dest="layer_params",
                   help="The layer parameters file")
 
-    op.add_option("--previous_model", default='/tmp/convnet/ConvNet__2014-04-14_20.01.51',
+    op.add_option("--previous_model", default=None,
                   action="store", type=str, dest="previous_model",
                   help="Location of the model")
 

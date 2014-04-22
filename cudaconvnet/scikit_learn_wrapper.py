@@ -28,14 +28,37 @@ logger = logging.getLogger(__name__)
 
 class InMemorySplitDataProvider:
     def __init__(self,X, y, fraction_test=0.05):
-        print 'X shape {}, y shape {}'.format( X.shape,y.shape)
-        X_train, X_test, y_train, y_test = train_test_split(X, y,test_size=fraction_test,random_state=42)
+
+        if fraction_test > 0.0:
+            if y is not None:
+                print 'X shape {}, y shape {}'.format( X.shape,y.shape)
+                X_train, X_test, y_train, y_test = train_test_split(X, y,test_size=fraction_test,random_state=42)
+            else:
+                print 'X shape {}'.format( X.shape)
+                X_train, X_test = train_test_split(X, test_size=fraction_test,random_state=42)
+                y_train = None
+        else:
+            X_train = X
+            y_train = y
+            X_test = None
+            y_test = None
 
         self.x_size = X_train.shape[1]
-        self.num_classes = np.max(X_test)+1
-        self.out_train = [scikit_data_provider.expand(X_train), scikit_data_provider.adjust_labels(y_train)]
-        self.out_test = [scikit_data_provider.expand(X_test), scikit_data_provider.adjust_labels(y_test)]
+        if y is not None:
+            self.num_classes = np.max(y_train)+1
+        else:
+            self.num_classes = None
+
+        if y is not None:
+            self.out_train = [scikit_data_provider.expand(X_train), scikit_data_provider.adjust_labels(y_train)]
+        else:
+            self.out_train = [scikit_data_provider.expand(X_train), None]
+        if X_test is not None:
+            self.out_test = [scikit_data_provider.expand(X_test), scikit_data_provider.adjust_labels(y_test)]
+        else:
+            self.out_test = None
         self.epoch_count = 0
+        self.epoch_count_test = 0
 
     def get_num_test_batches(self):
         return 1
@@ -45,7 +68,8 @@ class InMemorySplitDataProvider:
                     self.epoch_count += 1
                     return [self.epoch_count, 1 ,self.out_train]
                 else:
-                    return [self.epoch_count, 1, self.out_test]
+                    self.epoch_count_test += 1
+                    return [self.epoch_count_test, 1, self.out_test]
     def get_data_dims(self, idx):
         return self.x_size if idx == 0 else 1
 
@@ -54,14 +78,16 @@ class InMemorySplitDataProvider:
 
     def init_data_providers(self):
             self.epoch_count = 0
+            self.epoch_count_test = 0
 
 class ConvNetLearn(BaseEstimator, ClassifierMixin):
-    def __init__(self, layer_file, layer_params_file, output_folder="/tmp/convnet", epochs=400, fraction_test=0.01, mcp_layers=None, mcp_params=None, last_model=None):
+    def __init__(self, layer_file, layer_params_file, output_folder="/tmp/convnet", epochs=400, fraction_test=0.01, mcp_layers=None, mcp_params=None, last_model=None, init_states_models=None):
         print 'initializing the ConvNetLearn'
         self.layer_file = layer_file
         self.layer_params_file = layer_params_file
         self.last_model = last_model
         self.fraction_test = fraction_test
+        self.init_states_models = init_states_models
 
         if mcp_layers is None:
             self.mcp_layers = MyConfigParser(dict_type=OrderedDict)
@@ -136,20 +162,67 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
 
 
 
-    def fit(self, X, y, use_starting_point=False, **kwargs):
+    def fit(self, X, y, use_starting_point=True, **kwargs):
         print 'about to fit ConvNetLearn'
         if use_starting_point and self.last_model is not None:
             self.dict['-f']=self.last_model
 
+
         op = convnet.ConvNet.get_options_parser()
         op.parse_from_dictionary(self.dict)
-
 
         load_dic = None
         options = op.options
         if options["load_file"].value_given:
             print 'load file option provided'
             load_dic = IGPUModel.load_checkpoint(options["load_file"].value)
+
+            name_to_weights = {}
+            if self.init_states_models is not None:
+                name_to_weights = {}
+                for init_model in self.init_states_models:
+                    load_dic_local = IGPUModel.load_checkpoint(init_model)
+
+                    for k, v in load_dic_local['model_state'].iteritems():
+                        if k == 'layers':
+                            for elem in v:
+                                name = elem.get('name')
+                                weights =  elem.get('weights')
+                                if weights is not None:
+                                    print 'adding weights for layer {}'.format(name)
+                                    if name not in name_to_weights:
+                                        name_to_weights[name] = {}
+                                    name_to_weights[name]['weights'] = weights
+                                    name_to_weights[name]['biases'] = elem.get('biases')
+                                    name_to_weights[name]['weightsInc'] = elem.get('weightsInc')
+                                    name_to_weights[name]['biasesInc'] = elem.get('biasesInc')
+
+
+
+
+            if len(name_to_weights) > 0:
+                print 'layer names with init arrays: {}'.format(name_to_weights.keys())
+
+                for k, v in load_dic['model_state'].iteritems():
+                    if k == 'layers':
+                        for elem in v:
+                            name = elem.get('name')
+                            print 'name of layer to possibly be updated {}'.format(name)
+                            weights =  elem.get('weights')
+                            if weights is not None:
+                                if name in name_to_weights:
+                                    print 'changing init point of model for layer {}'.format(name)
+                                    coefs_name = name_to_weights.get(name)
+                                    if coefs_name is None or 'weights' not in coefs_name:
+                                        raise Exception('coeef names doent have weights for {}, coef names fields: {}'.format(name, coefs_name.keys()))
+                                    elem['weights'] = coefs_name['weights']
+                                    elem['biases'] = coefs_name['biases']
+                                    elem['weightsInc'] = coefs_name['weightsInc']
+                                    elem['biasesInc'] = coefs_name['biasesInc']
+
+
+
+
             old_op = load_dic["op"]
             old_op.merge_from(op)
             op = old_op
@@ -189,6 +262,7 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
                   convnet.ConvNet.__init__(self,op,load_dic=load_dic,initialize_from_file=False)
                   self.test_one = True
                   self.epoch = 1
+                  self.max_filesize_mb = 5000
 
             def get_data_dims(self, idx):
                 return data_provider.get_data_dims(idx)
@@ -211,7 +285,7 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
         print 'last model name {}'.format(self.last_model)
         model.start()
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, train=True):
         op = shownet.ShowConvNet.get_options_parser()
 
         predict_dict =  {
@@ -252,14 +326,18 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
                 out = None
 
                 while True:
-                    data_all = X.get_next_batch(train=True)
+                    data_all = data_provider.get_next_batch(train=train)
                     epoch, batch = data_all[0], data_all[1]
                     if epoch != 1:
                         break
                     print 'working on epoch: {}, batch: {}'.format(epoch, batch)
                     data = data_all[2]
-                    data_point = data[0].shape[1]
+                    if isinstance(data[0], list):
+                         data_point = data[0][4]
 
+                    else:
+                        data_point = data[0].shape[1]
+                    print 'data points {}'.format(data_point)
                     num_ftrs = self.layers[self.ftr_layer_idx]['outputs']
 
                     ftrs = np.zeros((data_point, num_ftrs), dtype=np.single)
@@ -276,9 +354,62 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
         model.cleanup()
         return probs
 
-    def plot_predictions(self, data_provider, output_file='/tmp/predictions.png'):
+    def plot_filters(self, data_provider,show_filters='conv1',  output_file='/tmp/filters.png'):
         op = shownet.ShowConvNet.get_options_parser()
 
+        predict_dict =  {
+            '--show-filters' : show_filters,
+            '--test-range': '2',
+            '--train-range': '1',
+            '--show-preds' : 'probs',
+            '-f': self.last_model,
+            '--data-provider': 'dp_scikit',
+            '--multiview-test': 0,
+            '--logreg-name': 'aaa'
+            }
+
+        op.parse_from_dictionary(predict_dict)
+        load_dic = None
+        options = op.options
+        if options["load_file"].value_given:
+            print 'load file option provided'
+            load_dic = IGPUModel.load_checkpoint(options["load_file"].value)
+            old_op = load_dic["op"]
+            old_op.merge_from(op)
+            op = old_op
+        op.eval_expr_defaults()
+
+        class MyConvNet(shownet.ShowConvNet):
+            def get_data_dims(self, idx):
+                return data_provider.get_data_dims(idx)
+
+            def get_num_classes(self):
+                return data_provider.get_num_classes()
+
+            def get_next_batch(self, train=True):
+                return data_provider.get_next_batch(True)
+
+            def get_num_test_batches(self):
+                return data_provider.get_num_test_batches()
+
+            def get_plottable_data(self, data):
+                return data_provider.get_plottable_data(data)
+
+            def init_data_providers(self):
+                data_provider.init_data_providers()
+
+            def get_label_names(self):
+                return data_provider.get_label_names()
+
+        model = MyConvNet(op, load_dic=load_dic)
+        model.plot_filters()
+        pl.savefig(output_file)
+        model.cleanup()
+
+    def plot_predictions(self, data_provider, output_file='/tmp/predictions.png', train=True, only_errors=True):
+        op = shownet.ShowConvNet.get_options_parser()
+
+        local_train = train
         predict_dict =  {
             '--write-features': 'probs',
             '--feature-path' : '/tmp/feature_path',
@@ -312,7 +443,7 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
                 return data_provider.get_num_classes()
 
             def get_next_batch(self, train=True):
-                return data_provider.get_next_batch(train)
+                return data_provider.get_next_batch(local_train)
 
             def get_num_test_batches(self):
                 return data_provider.get_num_test_batches()
@@ -329,32 +460,34 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
 
 
         model = MyConvNet(op, load_dic=load_dic)
+        model.only_errors = only_errors
         model.plot_predictions()
         pl.savefig(output_file)
         model.cleanup()
 
-    def predict(self,X):
-        probs = self.predict_proba(X)
+    def predict(self,X, train=False):
+        probs = self.predict_proba(X, train=train)
         print 'size of probs {}'.format(probs.shape)
         out =  np.argmax(probs, axis=1)
         print 'size of out {}'.format(out.shape)
         return out
 
-    def predict_best_proba(self, X, **kwargs):
-        probs = self.predict_proba(X)
+    def predict_best_proba(self, X, train=False, **kwargs):
+        probs = self.predict_proba(X, train=train)
         return np.max(probs, axis=1)
 
-    def score(self, X, y):
+    def score(self, X, y, train=False):
         if hasattr(X, 'get_next_batch'):
             data_provider = X
         else:
             data_provider = InMemorySplitDataProvider(X, y, fraction_test=0.0)
+            train = True
 
 
         y = None
         data_provider.init_data_providers()
         while True:
-                    data_all = data_provider.get_next_batch(train=True)
+                    data_all = data_provider.get_next_batch(train=train)
                     epoch, batch = data_all[0], data_all[1]
                     print 'epoch is {}'.format(epoch)
                     if epoch != 1:
@@ -368,7 +501,7 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
                         y = np.vstack((y, y_local))
         print 'shape y {}'.format(y.shape)
 
-        return accuracy_score(y, self.predict(X))
+        return accuracy_score(y, self.predict(X, train=train))
 
 
 def main():
@@ -443,7 +576,7 @@ def main():
 
         print 'type if x is {}'.format(type(X))
 
-    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=100)
+    net = ConvNetLearn(layer_file=opts.layer_def, layer_params_file=opts.layer_params, epochs=200)
     #net = SGDEntropyMaximizationFast(verbose=True, alpha= 0.001, early_stop=False, n_iter=10, min_epoch=10, learning_rate='fix')
 
     #print 'fitting'

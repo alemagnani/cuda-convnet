@@ -56,7 +56,16 @@ class TreeNodeData(object):
         path = self.get_path(tree_node_id)
         return [self.get_tree_node(id).get('name') for id in path]
 
-    @cache
+    def find_root_ids(self):
+
+        out = []
+        for node in self:
+            parentId = node.get('parentId')
+            if parentId is None:
+                out.append(node.get('id'))
+        return out
+
+
     def get_path(self,tree_node_id):
         path = []
         path.append(tree_node_id)
@@ -72,6 +81,7 @@ class TreeNodeData(object):
             parentId = node.get('parentId')
         return path
 
+    @cache
     def get_children_ids(self, tree_node_id):
         #inefficient code TODO
         out = []
@@ -80,6 +90,7 @@ class TreeNodeData(object):
             if parentId is not None and parentId == tree_node_id:
                 out.append(node.get('id'))
         return out
+
 
     def get_all_children_ids(self, tree_node_id):
         out = []

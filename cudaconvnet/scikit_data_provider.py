@@ -78,6 +78,19 @@ def expand(matrix):
         #print 'the shape is {}'.format(out.shape)
         return out
 
+def slice(batch_data, idx):
+    if  isinstance(batch_data,list):
+        csrm = csr_matrix( (batch_data[0],batch_data[1],batch_data[2]), shape=(batch_data[4],batch_data[3]))
+        csrm = csrm[idx,:]
+        #print 'output size {}'.format(csrm.shape)
+        return expand(csrm)
+    else:
+        print 'batch_data shape {}, max idx: {}'.format(batch_data.shape, np.max(idx))
+        out =  np.require(batch_data[:,idx], requirements='C')
+        #print 'output size {}'.format(out.shape)
+        return out
+
+
 def check_correct_indeces(X):
 
     ind = X.indices

@@ -278,6 +278,7 @@ class IGPUModel:
         pickle(checkpoint_file_full_path, dic,compress=self.zip_save)
         
         for f in sorted(os.listdir(checkpoint_dir), key=alphanum_key):
+            print 'max filesize save mb: {}'.format(self.max_filesize_mb)
             if sum(os.path.getsize(os.path.join(checkpoint_dir, f2)) for f2 in os.listdir(checkpoint_dir)) > self.max_filesize_mb*1024*1024 and f != checkpoint_file:
                 print 'removing checkpoint: {}'.format(f)
                 os.remove(os.path.join(checkpoint_dir, f))

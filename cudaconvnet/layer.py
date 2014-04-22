@@ -641,6 +641,25 @@ class NeuronLayerParser(LayerWithInputParser):
         print "Initialized neuron layer '%s', producing %d outputs" % (name, dic['outputs'])
         return dic
 
+class UnionLayerParser(LayerWithInputParser):
+    def __init__(self):
+        LayerWithInputParser.__init__(self)
+
+    def parse(self, name, mcp, prev_layers, model):
+        dic = LayerWithInputParser.parse(self, name, mcp, prev_layers, model)
+
+        if len(dic['numInputs']) != 2:
+            raise LayerParsingError("Layer '%s': a union layer can only have 2 layers as input ( at least for now)")
+        print 'union layer dic[numinputs]: {}'.format(dic['numInputs'])
+        dic['outputs'] = dic['numInputs'][0] + dic['numInputs'][1]
+        dic['usesInputs'] = False
+        dic['usesActs'] = False
+        dic['forceOwnActs'] = False
+        print "Initialized union  layer '%s', producing %d outputs" % (name, dic['outputs'])
+        return dic
+
+
+
 class EltwiseSumLayerParser(LayerWithInputParser):
     def __init__(self):
         LayerWithInputParser.__init__(self)
@@ -650,6 +669,7 @@ class EltwiseSumLayerParser(LayerWithInputParser):
         
         if len(set(dic['numInputs'])) != 1:
             raise LayerParsingError("Layer '%s': all inputs must have the same dimensionality. Got dimensionalities: %s" % (name, ", ".join(str(s) for s in dic['numInputs'])))
+        print 'sum layer dic[numinputs]: {}'.format(dic['numInputs'])
         dic['outputs'] = dic['numInputs'][0]
         dic['usesInputs'] = False
         dic['usesActs'] = False
@@ -1170,6 +1190,7 @@ layer_parsers = {'data': lambda : DataLayerParser(),
                  'conv': lambda : ConvLayerParser(),
                  'local': lambda : LocalUnsharedLayerParser(),
                  'softmax': lambda : SoftmaxLayerParser(),
+                 'union': lambda : UnionLayerParser(),
                  'eltsum': lambda : EltwiseSumLayerParser(),
                  'eltmax': lambda : EltwiseMaxLayerParser(),
                  'neuron': lambda : NeuronLayerParser(),
