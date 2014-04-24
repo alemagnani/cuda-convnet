@@ -58,16 +58,16 @@ void SparseNVMatrix::copyFromHost(const SparseMatrix& hostMatrix) {
 	assert(hostMatrix.get_sparse_type() == get_sparse_type());
 
 	if (_nzz > 0) {
-		cout << "copying sparse data from host to device\n";
+		//cout << "copying sparse data from host to device\n";
 		checkCudaErrors(cudaMemcpy(_devData, hostMatrix.getData(),
 				sizeof(float) * _nzz , cudaMemcpyHostToDevice));
-		cout << "copying sparse data indices from host to device\n";
+		//cout << "copying sparse data indices from host to device\n";
 		checkCudaErrors(cudaMemcpy(_sparseInd, hostMatrix.getSparseInd(),
 				sizeof(int) * _nzz , cudaMemcpyHostToDevice));
-		cout << "copying sparse data ptr from host to device\n";
+		//cout << "copying sparse data ptr from host to device\n";
 		checkCudaErrors(cudaMemcpy( _sparsePtr, hostMatrix.getSparsePtr(),
 				sizeof(int) * ( (get_sparse_type() == SparseMatrix::CSC ?getNumCols() : getNumRows())+1) , cudaMemcpyHostToDevice));
-		cout << "done copying data\n";
+		//cout << "done copying data\n";
 
 	}
 	_hostmatrix =  & hostMatrix;

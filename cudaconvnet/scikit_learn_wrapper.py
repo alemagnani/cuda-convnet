@@ -6,6 +6,7 @@ import io
 import shutil
 from sklearn import datasets
 from scipy.sparse import  csr_matrix
+import sklearn
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
@@ -476,7 +477,7 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
         probs = self.predict_proba(X, train=train)
         return np.max(probs, axis=1)
 
-    def score(self, X, y, train=False):
+    def score(self, X, y, train=False, type='accuracy'):
         if hasattr(X, 'get_next_batch'):
             data_provider = X
         else:
@@ -500,8 +501,15 @@ class ConvNetLearn(BaseEstimator, ClassifierMixin):
                     else:
                         y = np.vstack((y, y_local))
         print 'shape y {}'.format(y.shape)
-
-        return accuracy_score(y, self.predict(X, train=train))
+        predictions = self.predict(X, train=train)
+        if type == 'accuracy':
+            return accuracy_score(y, predictions)
+        elif type == 'f1macro':
+            return sklearn.metrics.f1_score(y,predictions,average='macro')
+        elif type == 'f1':
+            return sklearn.metrics.f1_score(y,predictions,average='weighted')
+        else:
+            raise Exception('unrecognized type: {}'.format(type))
 
 
 def main():

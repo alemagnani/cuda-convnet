@@ -2,7 +2,7 @@ from scipy.sparse import csr_matrix
 from sklearn.cross_validation import train_test_split
 from data import DataProvider
 import numpy as np
-
+import random as nr
 
 class ScikitDataProvider(DataProvider):
     def __init__(self, data, batch_range=None, init_epoch=1, init_batchnum=None, dp_params={}, test=False, fraction_test=0.01):
@@ -65,7 +65,28 @@ def adjust_labels(labels):
     return out
 
 
-def expand(matrix):
+def crop_flip_image_data(x, border_size=4, image_size=64, flip_image=True):
+    inner_size = image_size - 2 * border_size
+    #print 'image size: {}, border_size: {}, inner size: {}'.format(image_size, border_size, inner_size)
+    #print 'image size: {}, border_size: {}, inner size: {}'.format(image_size, border_size, inner_size)
+
+    y = x.reshape(3, image_size, image_size, x.shape[1])
+    out = np.zeros(((3 * inner_size * inner_size), x.shape[1]))
+    #print 'size of out for reshaping: {}'.format(out.shape)
+
+    for c in xrange(x.shape[1]): # loop over cases
+        startY, startX = nr.randint(0,border_size*2 ), nr.randint(0,border_size*2 )
+        endY, endX = startY + inner_size, startX + inner_size
+        pic = y[:,startY:endY,startX:endX, c]
+        #print 'pic shape: {}'.format(pic.shape)
+        if flip_image:
+            if nr.randint(0,1) == 0: # also flip the image with 50% probability
+                #print 'flipping image'
+                pic = pic[:,:,::-1]
+        out[:,c] = pic.reshape((3 * inner_size * inner_size,))
+    return out
+
+def expand(matrix, crop_image=False, border_size=4, image_size=64,flip_image=True):
     if isinstance(matrix, csr_matrix):
         check_correct_indeces(matrix)
         rows, cols = matrix.shape
@@ -74,7 +95,10 @@ def expand(matrix):
         return [np.require(matrix.data, dtype=np.float32, requirements='C'),np.require( matrix.indices, dtype=np.int32, requirements='C'), np.require(matrix.indptr, dtype=np.int32, requirements='C'), cols, rows]
     else:
         #print 'working with a dense matrix'
-        out =  np.require(matrix.T, dtype=np.float32, requirements='C')
+        x = matrix.T
+        if crop_image:
+            x = crop_flip_image_data(x,border_size=border_size,image_size=image_size,flip_image=flip_image)
+        out =  np.require(x, dtype=np.float32, requirements='C')
         #print 'the shape is {}'.format(out.shape)
         return out
 

@@ -27,14 +27,14 @@ def _transform(y, encoder):
     except:
         return -1
 
-def run_single_model(batch_folder, output_folder, layer_file, layer_params_file, epochs=5, last_model=None, max_batch=None, init_states_models=None):
+def run_single_model(batch_folder, output_folder, layer_file, layer_params_file, epochs=5, last_model=None, max_batch=None, init_states_models=None, crop_image=False, border_size=8):
 
     with open(join(batch_folder, 'label_encoder.p'), 'rb') as encoder_file:
         label_encoder = cPickle.load(encoder_file)
 
     label_transformer = LabelTransformer(label_encoder)
     print 'labels: {}'.format(label_transformer.get_label_names())
-    data_provider = ImageDataProvider(batch_folder, 'train', test_interval=15, label_transformer=label_transformer, max_batch=max_batch)
+    data_provider = ImageDataProvider(batch_folder, 'train', test_interval=15, label_transformer=label_transformer, max_batch=max_batch,  crop_image=crop_image, border_size=border_size)
 
     num_classes = data_provider.get_num_classes()
     print 'num classes: {}'.format(num_classes)
@@ -45,8 +45,8 @@ def run_single_model(batch_folder, output_folder, layer_file, layer_params_file,
         os.mkdir(output_folder)
 
 
-    fit_model = False
-    data_provider_test = ImageDataProvider(batch_folder, 'test', test_interval=0, label_transformer=label_transformer, max_batch=max_batch)
+    fit_model = True
+    data_provider_test = ImageDataProvider(batch_folder, 'test', test_interval=0, label_transformer=label_transformer, max_batch=max_batch, crop_image=crop_image, border_size=border_size)
     if fit_model:
         net.fit(data_provider, None, use_starting_point=True)
 
@@ -54,8 +54,16 @@ def run_single_model(batch_folder, output_folder, layer_file, layer_params_file,
 
         score_test = net.score(data_provider_test, None, train=True)
         score_test_of_train = net.score(data_provider, None, train=False)
+        score_test_f1macro = net.score(data_provider_test, None, train=True, type='f1macro')
+        score_test_of_train_f1macro = net.score(data_provider, None, train=False, type='f1macro')
+        score_test_f1 = net.score(data_provider_test, None, train=True, type='f1')
+        score_test_of_train_f1 = net.score(data_provider, None, train=False, type='f1')
         print 'score on test data is {}'.format(score_test)
         print 'score on test part of the train data is {}'.format(score_test_of_train)
+        print 'score f1 macro on test data is {}'.format(score_test_f1macro)
+        print 'score f1 macro on test part of the train data is {}'.format(score_test_of_train_f1macro)
+        print 'score f1 on test data is {}'.format(score_test_f1)
+        print 'score f1 on test part of the train data is {}'.format(score_test_of_train_f1)
 
         model_folder = join(output_folder,'model')
         if os.path.exists(model_folder):
@@ -94,14 +102,14 @@ def main():
                   action="store", type=str, dest="output_folder",
                   help="Location of the output")
 
-    op.add_option("--layer_def", default='./layers/layers-image-text.cfg',action="store", type=str, dest="layer_def",help="Layer definition.")
+    #op.add_option("--layer_def", default='./layers/layers-image-text.cfg',action="store", type=str, dest="layer_def",help="Layer definition.")
     #op.add_option("--layer_def", default='./layers/layers-text.cfg',action="store", type=str, dest="layer_def",help="Layer definition.")
-    #op.add_option("--layer_def", default='./layers/layers-image.cfg',action="store", type=str, dest="layer_def",help="Layer definition.")
+    op.add_option("--layer_def", default='./layers/layers-image.cfg',action="store", type=str, dest="layer_def",help="Layer definition.")
     #op.add_option("--layer_def", default='./layers/layers-text-simple.cfg',action="store", type=str, dest="layer_def",help="Layer definition.")
 
-    op.add_option("--layer_params", default='./layers/layer-params-image-text.cfg',action="store", type=str, dest="layer_params",help="The layer parameters file")
+    #op.add_option("--layer_params", default='./layers/layer-params-image-text.cfg',action="store", type=str, dest="layer_params",help="The layer parameters file")
     #op.add_option("--layer_params", default='./layers/layer-params-text.cfg',action="store", type=str, dest="layer_params",help="The layer parameters file")
-    #op.add_option("--layer_params", default='./layers/layer-params-image.cfg',action="store", type=str, dest="layer_params",help="The layer parameters file")
+    op.add_option("--layer_params", default='./layers/layer-params-image.cfg',action="store", type=str, dest="layer_params",help="The layer parameters file")
     #op.add_option("--layer_params", default='./layers/layer-params-text-simple.cfg',action="store", type=str, dest="layer_params",help="The layer parameters file")
 
 
@@ -125,9 +133,11 @@ def main():
     if init_model_string is not None:
         init_states_models = init_model_string.split(',')
 
+    crop_image = True
+    border_size = 8
 
 
-    run_single_model(opts.batch_folder, opts.output_folder, opts.layer_def, opts.layer_params,epochs=10, last_model=opts.last_model, init_states_models=init_states_models)
+    run_single_model(opts.batch_folder, opts.output_folder, opts.layer_def, opts.layer_params,epochs=30, last_model=opts.last_model, init_states_models=init_states_models, crop_image=crop_image, border_size=border_size)
 
 if __name__ == "__main__":
         main()

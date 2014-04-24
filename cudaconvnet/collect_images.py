@@ -9,13 +9,14 @@ from PIL import Image
 import cPickle
 import datetime
 from joblib import Parallel, delayed
+import math
 import numpy as np
 from os.path import join
 from pymongo import MongoClient
 from scipy.sparse import csr_matrix
 from scikit_data_provider import expand, adjust_labels
 import pylab as pl
-
+import random as nr
 
 def transform(items, array_extractor, n_jobs=5, **kwargs):
     list_arrays = Parallel(n_jobs=n_jobs)(
@@ -58,7 +59,7 @@ def process_batch(files, size=(32, 32), n_jobs=5):
 
 
 class ImageDataProvider:
-    def __init__(self, folder, prefix, test_interval=25, label_transformer=None, max_batch=None):
+    def __init__(self, folder, prefix, test_interval=25, label_transformer=None, max_batch=None, crop_image=False, border_size=4, flip_image=True, bool_text=False):
         self.test_interval = test_interval
         self.current_train_index = 1
         self.current_test_index = self.test_interval
@@ -71,13 +72,20 @@ class ImageDataProvider:
             self.mean = cPickle.load(mf)
         self.label_transformer = label_transformer
         self.test_batches = None
-        self.img_size = 64
+
+
+        self.img_size = int(math.sqrt(self.mean.shape[0]/3))
+        print 'image size: {}'.format(self.img_size)
         self.max_batch = max_batch
 
         fname = join(self.folder, '{}_{}.p.gz'.format(self.prefix, '1'))
         with gzip.open(fname, 'rb') as f:
                 X_batch, y_batch, image_data = cPickle.load(f)
         self.text_size = X_batch.shape[1]
+        self.crop_image = crop_image
+        self.border_size = border_size
+        self.flip_image = flip_image
+        self.bool_text = bool_text
 
 
     def get_num_test_batches(self):
@@ -121,8 +129,8 @@ class ImageDataProvider:
             else:
                 batch = self.current_train_index
             transform_y = self.label_transformer.transform(y_batch)
-            print 'image data shape: {}, X_batch data shape: {}'.format(image_data.shape,X_batch.shape)
-            out = [epoch, batch, [expand(image_data), adjust_labels(transform_y), expand(X_batch)]]
+            #print 'image data shape: {}, X_batch data shape: {}'.format(image_data.shape,X_batch.shape)
+            out = [epoch, batch, [expand(image_data,crop_image=self.crop_image,border_size=self.border_size,image_size=self.img_size,flip_image=self.flip_image), adjust_labels(transform_y), expand(X_batch)]]
             self.current_train_index += 1
             if not (self.test_interval is None or self.test_interval <= 1):
                 if self.current_train_index % self.test_interval == 0:
@@ -144,9 +152,9 @@ class ImageDataProvider:
 
             epoch = self.epoch_count_test
             batch = self.current_test_index / self.test_interval
-            print 'image data shape: {}, X_batch data shape: {}'.format(image_data.shape,X_batch.shape)
+            #print 'image data shape: {}, X_batch data shape: {}'.format(image_data.shape,X_batch.shape)
             transform_y = self.label_transformer.transform(y_batch)
-            out = [epoch, batch, [expand(image_data), adjust_labels(transform_y), expand(X_batch)]]
+            out = [epoch, batch, [expand(image_data,crop_image=self.crop_image,border_size=self.border_size,image_size=self.img_size,flip_image=self.flip_image), adjust_labels(transform_y), expand(X_batch)]]
             self.current_test_index += self.test_interval
 
             return out
@@ -156,7 +164,12 @@ class ImageDataProvider:
 
     def get_data_dims(self, idx):
         if idx == 0:
-            return self.mean.shape[0]
+
+            if self.crop_image:
+                crop_size = self.img_size - 2*self.border_size
+                return crop_size * crop_size * 3
+            else:
+                return self.img_size * self.img_size * 3
         elif idx == 1:
             return 1
         elif idx == 2:
@@ -172,6 +185,9 @@ class ImageDataProvider:
         self.epoch_count_test = 1
         self.current_train_index = 1
         self.current_test_index = self.test_interval
+
+
+
 
 
 def main():
